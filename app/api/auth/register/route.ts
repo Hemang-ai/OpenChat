@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { db } from "@/lib/db/client";
+import { hashPassword } from "@/lib/auth/password";
+import { signToken, COOKIE_NAME_EXPORT } from "@/lib/auth/jwt";
+import { slugify } from "@/lib/utils/validation";
+
+const schema = z.object({
+  name: z.string().min(2).max(100),
+  email: z.string().email(),
+  password: z.string().min(8).max(100),
+  workspaceName: z.string().min(2).max(100),
+});
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { name, email, password, workspaceName } = schema.parse(body);
+
+    const existing = await db.user.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+    }
+
+    const passwordHash = await hashPassword(password);
+    const slug = slugify(workspaceName) + "-" + Math.random().toString(36).slice(2, 6);
+
+    const user = await db.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        workspaces: {
+          create: {
+            name: workspaceName,
+            slug,
+          },
+        },
+      },
+    });
+
+    const token = signToken({ userId: user.id, email: user.email });
+
+    const response = NextResponse.json({ success: true, userId: user.id });
+    response.cookies.set(COOKIE_NAME_EXPORT, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+
+    return response;
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: err.issues[0]?.message || err.message }, { status: 400 });
+    }
+    console.error("Register error:", err);
+    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
+  }
+}

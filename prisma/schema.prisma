@@ -1,0 +1,154 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  workspaces   Workspace[]
+}
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  // Per-workspace AI configuration (each business uses its own keys)
+  llmProvider           String?  // primary: "openai" | "anthropic" | "groq" | "ollama" | "gemini"
+  fallbackLlmProvider   String?  // used if primary chat call fails
+  openaiApiKey          String?
+  openaiModel           String?
+  openaiEmbeddingModel  String?
+  anthropicApiKey       String?
+  anthropicModel        String?
+  groqApiKey            String?
+  groqModel             String?
+  ollamaBaseUrl         String?
+  ollamaModel           String?
+  geminiApiKey          String?
+  geminiModel           String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bots        Bot[]
+}
+
+model Bot {
+  id               String            @id @default(cuid())
+  name             String
+  description      String?
+  publicKey        String            @unique @default(cuid())
+  welcomeMessage   String            @default("Hello! How can I help you today?")
+  systemPrompt     String?
+  businessContext  String?
+  tone             String            @default("professional")
+  strictness       String            @default("strict") // "strict" | "balanced" | "flexible"
+  fallbackBehavior String            @default("contact") // "contact" | "general_knowledge" | "ask_clarify"
+  contactInfo      String?           // shown when bot can't answer
+  suggestedQuestions Json?           // cached starter questions auto-generated from knowledge
+  suggestedQuestionsUpdatedAt DateTime?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workspaceId      String
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  knowledgeSources KnowledgeSource[]
+  conversations    Conversation[]
+}
+
+model KnowledgeSource {
+  id           String          @id @default(cuid())
+  type         SourceType
+  name         String
+  url          String?
+  filePath     String?
+  mimeType     String?
+  fileSize     Int?
+  status       IngestionStatus @default(PENDING)
+  errorMessage String?
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  botId        String
+  bot          Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  documents    Document[]
+}
+
+model Document {
+  id                String          @id @default(cuid())
+  title             String?
+  content           String
+  createdAt         DateTime        @default(now())
+  knowledgeSourceId String
+  knowledgeSource   KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+  chunks            DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  content    String
+  chunkIndex Int
+  embedding  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  sessionId String    @unique @default(cuid())
+  botId     String
+  bot       Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+  userAgent String?
+  ipAddress String?
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  role           MessageRole
+  content        String
+  isGrounded     Boolean?
+  isRefused      Boolean?
+  sourceChunkIds String[]
+  createdAt      DateTime    @default(now())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+enum SourceType {
+  FILE
+  WEBSITE
+  YOUTUBE
+  MANUAL
+  GOOGLE_DRIVE
+}
+
+enum IngestionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}

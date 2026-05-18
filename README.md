@@ -6,9 +6,9 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 
-> **🚧 Phased open-source release — Parts 1 & 2 of 4 shipped.**
-> Currently runnable: auth, multi-tenant schema, landing page (with animated dashboard mockup), full admin dashboard, bot CRUD, multi-provider AI settings (OpenAI / Anthropic / Gemini / Groq / Ollama) with primary + fallback chain, Docker setup.
-> Coming next: knowledge ingestion (Part 3), RAG chat + public embed widget + analytics (Part 4).
+> **🚧 Phased open-source release — Parts 1, 2 & 3 of 4 shipped.**
+> Currently runnable: auth, multi-tenant schema, landing page, admin dashboard, multi-provider AI settings (OpenAI / Anthropic / Gemini / Groq / Ollama) with primary + fallback chain, **and the full knowledge ingestion pipeline** (PDF, DOCX, TXT, MD, CSV, website URLs, YouTube transcripts, manual text — chunking + embeddings + pgvector storage).
+> Coming next: RAG chat + suggested questions + public embed widget + analytics (Part 4).
 
 ## What is OpenBusinessChat?
 
@@ -34,10 +34,13 @@ OpenBusinessChat is a production-ready, self-hostable AI chatbot platform that l
 | Multi-provider LLM abstraction (OpenAI / Anthropic / Gemini / Groq / Ollama) | ✅ Part 2 |
 | Primary + fallback provider chain with auto-failover | ✅ Part 2 |
 | Animated dashboard mockup on landing page | ✅ Part 2 |
-| File upload (PDF, DOCX, TXT, MD, CSV) | 🚧 Part 3 |
-| Website URL ingestion | 🚧 Part 3 |
-| YouTube transcript extraction | 🚧 Part 3 |
-| Chunking + embeddings + pgvector retrieval | 🚧 Part 3 |
+| File upload (PDF, DOCX, TXT, MD, CSV) | ✅ Part 3 |
+| Website URL ingestion (single-page) | ✅ Part 3 |
+| YouTube transcript extraction | ✅ Part 3 |
+| Manual text knowledge | ✅ Part 3 |
+| Sliding-window chunking + OpenAI embeddings | ✅ Part 3 |
+| pgvector storage with per-bot scoping | ✅ Part 3 |
+| Google Drive integration (placeholder) | ✅ Part 3 |
 | RAG chat (strict/balanced/flexible modes) | 🚧 Part 4 |
 | Auto-generated starter questions | 🚧 Part 4 |
 | Public iframe + script embed widget | 🚧 Part 4 |

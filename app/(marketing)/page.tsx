@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import DashboardMockup from "@/components/marketing/dashboard-mockup";
 import {
   Bot, Upload, Globe, Play, Code, MessageSquare,
   Shield, Zap, GitBranch, Check, ChevronRight, Star
@@ -24,7 +25,7 @@ export default function LandingPage() {
             <Link href="#how-it-works" className="hover:text-gray-900 transition-colors">How it works</Link>
             <Link href="#open-source" className="hover:text-gray-900 transition-colors">Open source</Link>
             <a
-              href="https://github.com/openbusinesschat/openbusinesschat"
+              href="https://github.com/Hemang-ai/OpenChat"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-gray-900 transition-colors"
@@ -66,7 +67,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <a
-              href="https://github.com/openbusinesschat/openbusinesschat"
+              href="https://github.com/Hemang-ai/OpenChat"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -79,16 +80,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Dashboard preview placeholder — animated mockup arrives in a later release */}
+      {/* Animated dashboard mockup */}
       <section className="pb-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-12 flex flex-col items-center justify-center min-h-[300px] text-center">
-            <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mb-4">
-              <Bot className="w-8 h-8 text-white" />
-            </div>
-            <p className="text-gray-700 font-medium">Train. Embed. Chat.</p>
-            <p className="text-gray-500 text-sm mt-1">Your business knowledge → a live AI chatbot in minutes.</p>
-          </div>
+          <DashboardMockup />
         </div>
       </section>
 
@@ -177,7 +172,7 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <a
-                  href="https://github.com/openbusinesschat/openbusinesschat"
+                  href="https://github.com/Hemang-ai/OpenChat"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1"
@@ -218,7 +213,7 @@ export default function LandingPage() {
             <span>OpenBusinessChat — MIT License</span>
           </div>
           <div className="flex gap-6">
-            <a href="https://github.com/openbusinesschat/openbusinesschat" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900">GitHub</a>
+            <a href="https://github.com/Hemang-ai/OpenChat" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900">GitHub</a>
             <Link href="/login" className="hover:text-gray-900">Login</Link>
             <Link href="/register" className="hover:text-gray-900">Register</Link>
           </div>

@@ -6,9 +6,9 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 
-> **🚧 Phased open-source release — Part 1 of 4 (Foundation) shipped.**
-> Currently runnable: auth, multi-tenant schema, landing page, design system, Docker setup.
-> Coming in upcoming commits: admin dashboard (Part 2), knowledge ingestion (Part 3), RAG chat + embed widget (Part 4).
+> **🚧 Phased open-source release — Parts 1 & 2 of 4 shipped.**
+> Currently runnable: auth, multi-tenant schema, landing page (with animated dashboard mockup), full admin dashboard, bot CRUD, multi-provider AI settings (OpenAI / Anthropic / Gemini / Groq / Ollama) with primary + fallback chain, Docker setup.
+> Coming next: knowledge ingestion (Part 3), RAG chat + public embed widget + analytics (Part 4).
 
 ## What is OpenBusinessChat?
 
@@ -30,8 +30,10 @@ OpenBusinessChat is a production-ready, self-hostable AI chatbot platform that l
 | Landing page, login, register | ✅ Part 1 |
 | shadcn/ui design system | ✅ Part 1 |
 | Docker Compose for local pgvector | ✅ Part 1 |
-| Admin dashboard (bot CRUD, AI provider settings) | 🚧 Part 2 |
-| Multi-provider LLM abstraction (OpenAI / Anthropic / Gemini / Groq / Ollama) | 🚧 Part 2 |
+| Admin dashboard (workspace selector, bot CRUD, AI Settings) | ✅ Part 2 |
+| Multi-provider LLM abstraction (OpenAI / Anthropic / Gemini / Groq / Ollama) | ✅ Part 2 |
+| Primary + fallback provider chain with auto-failover | ✅ Part 2 |
+| Animated dashboard mockup on landing page | ✅ Part 2 |
 | File upload (PDF, DOCX, TXT, MD, CSV) | 🚧 Part 3 |
 | Website URL ingestion | 🚧 Part 3 |
 | YouTube transcript extraction | 🚧 Part 3 |

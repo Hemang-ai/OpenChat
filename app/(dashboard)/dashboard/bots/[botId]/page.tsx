@@ -5,11 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Lock } from "lucide-react";
 import BotSettingsTab from "@/components/dashboard/bot-settings-tab";
+import KnowledgeTab from "@/components/dashboard/knowledge-tab";
 
 /**
- * Bot detail page — Phase 2 release.
- * Only the Settings tab is wired up; Knowledge, Preview, Embed, Analytics, and Logs
- * arrive in upcoming releases (Parts 3 & 4).
+ * Bot detail page — Phase 3 release.
+ * Settings + Knowledge tabs are wired up; Preview, Embed, Analytics, and Logs arrive in Part 4.
  */
 export default async function BotPage({ params }: { params: Promise<{ botId: string }> }) {
   const session = await getSession();
@@ -19,7 +19,17 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
 
   const bot = await db.bot.findFirst({
     where: { id: botId, workspace: { ownerId: session.userId } },
-    include: { workspace: { select: { id: true, name: true } } },
+    include: {
+      workspace: { select: { id: true, name: true } },
+      knowledgeSources: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true, type: true, name: true, status: true,
+          createdAt: true, errorMessage: true, url: true,
+          fileSize: true, mimeType: true,
+        },
+      },
+    },
   });
 
   if (!bot) notFound();
@@ -44,12 +54,10 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
         </div>
       </div>
 
-      <Tabs defaultValue="settings">
+      <Tabs defaultValue="knowledge">
         <TabsList className="mb-6 flex-wrap h-auto gap-1">
+          <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="knowledge" disabled className="opacity-50">
-            <Lock className="w-3 h-3 mr-1" /> Knowledge (Part 3)
-          </TabsTrigger>
           <TabsTrigger value="preview" disabled className="opacity-50">
             <Lock className="w-3 h-3 mr-1" /> Preview (Part 4)
           </TabsTrigger>
@@ -57,6 +65,10 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
             <Lock className="w-3 h-3 mr-1" /> Embed (Part 4)
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="knowledge">
+          <KnowledgeTab bot={{ id: bot.id, name: bot.name }} sources={bot.knowledgeSources} />
+        </TabsContent>
 
         <TabsContent value="settings">
           <BotSettingsTab bot={{

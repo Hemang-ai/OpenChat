@@ -3,14 +3,14 @@ import { getSession } from "@/lib/auth/jwt";
 import { db } from "@/lib/db/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Lock } from "lucide-react";
-import BotSettingsTab from "@/components/dashboard/bot-settings-tab";
+import { Bot } from "lucide-react";
 import KnowledgeTab from "@/components/dashboard/knowledge-tab";
+import BotSettingsTab from "@/components/dashboard/bot-settings-tab";
+import EmbedTab from "@/components/dashboard/embed-tab";
+import ChatPreviewTab from "@/components/dashboard/chat-preview-tab";
+import AnalyticsTab from "@/components/dashboard/analytics-tab";
+import LogsTab from "@/components/dashboard/logs-tab";
 
-/**
- * Bot detail page — Phase 3 release.
- * Settings + Knowledge tabs are wired up; Preview, Embed, Analytics, and Logs arrive in Part 4.
- */
 export default async function BotPage({ params }: { params: Promise<{ botId: string }> }) {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -57,17 +57,31 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
       <Tabs defaultValue="knowledge">
         <TabsList className="mb-6 flex-wrap h-auto gap-1">
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
+          <TabsTrigger value="embed">Embed</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="preview" disabled className="opacity-50">
-            <Lock className="w-3 h-3 mr-1" /> Preview (Part 4)
-          </TabsTrigger>
-          <TabsTrigger value="embed" disabled className="opacity-50">
-            <Lock className="w-3 h-3 mr-1" /> Embed (Part 4)
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="knowledge">
           <KnowledgeTab bot={{ id: bot.id, name: bot.name }} sources={bot.knowledgeSources} />
+        </TabsContent>
+
+        <TabsContent value="preview">
+          <ChatPreviewTab bot={{ id: bot.id, name: bot.name, welcomeMessage: bot.welcomeMessage }} />
+        </TabsContent>
+
+        <TabsContent value="embed">
+          <EmbedTab bot={{ id: bot.id, name: bot.name, publicKey: bot.publicKey }} />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AnalyticsTab botId={bot.id} />
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <LogsTab botId={bot.id} />
         </TabsContent>
 
         <TabsContent value="settings">

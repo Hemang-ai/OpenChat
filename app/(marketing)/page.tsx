@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import FlowAnimation from "@/components/marketing/flow-animation";
 import DashboardMockup from "@/components/marketing/dashboard-mockup";
 import {
   Bot, Upload, Globe, Play, Code, MessageSquare,
@@ -116,6 +117,11 @@ export default function LandingPage() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-3">How it works — end to end</h2>
             <p className="text-gray-600">Watch knowledge become a live chatbot in real time.</p>
+          </div>
+
+          {/* Animated end-to-end flow */}
+          <div className="mb-16">
+            <FlowAnimation />
           </div>
 
           <div className="text-center mb-12">

@@ -111,8 +111,12 @@ export async function ingestKnowledgeSource(sourceId: string): Promise<void> {
       },
     });
 
-    // Hook for Part 4: refresh starter questions in the background after ingestion completes.
-    // (Will be wired up when lib/rag/suggested-questions.ts lands in Part 4.)
+    // Refresh starter questions in the background (don't block ingestion completion)
+    import("@/lib/rag/suggested-questions").then((m) =>
+      m.generateSuggestedQuestions(source.botId).catch((e) =>
+        console.warn("Failed to refresh suggested questions:", e)
+      )
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     await db.knowledgeSource.update({

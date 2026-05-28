@@ -19,6 +19,7 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 - **Upload knowledge** — PDFs, Word docs, TXT, CSV, Markdown, website URLs, YouTube transcripts, manual text
 - **RAG-grounded answers** — pgvector retrieval, configurable strictness, source citations
 - **Embed anywhere** — `<iframe>` or one-line `<script>` widget
+- **Capture leads from chat** — optional visitor follow-up form plus a dashboard lead inbox
 - **Bring your own AI** — OpenAI, Anthropic, Google Gemini, Groq, or local Ollama (with primary + fallback chain)
 - **Multi-tenant** — each business workspace has its own bots, knowledge, and API keys
 - **Production-grade** — TypeScript end-to-end, Prisma + PostgreSQL, secure auth, abuse protection
@@ -104,6 +105,57 @@ Open **[http://localhost:3000](http://localhost:3000)**.
 
 ---
 
+## Lead capture
+
+OpenBusinessChat now includes a built-in lead capture workflow so the bot can turn anonymous website conversations into follow-up opportunities.
+
+### Why it matters
+
+Many business chatbots answer questions but lose the visitor when the conversation ends. Lead capture closes that gap: after a visitor engages with the embedded chat, the widget can invite them to leave contact details for a human follow-up. This makes the product more valuable for agencies, service businesses, sales teams, clinics, local businesses, and any company that wants support conversations to become pipeline.
+
+### Visitor experience
+
+When lead capture is enabled for a bot:
+
+1. The visitor asks a question in the public iframe or script widget.
+2. The chat shows a compact **Human follow-up** card after the first real user message.
+3. The visitor can submit name, email, phone, company, and a short request.
+4. The widget confirms that the details were sent.
+
+The form is intentionally optional and appears after engagement, so the bot still feels helpful before it asks for contact information.
+
+### Admin workflow
+
+Inside **Dashboard → Bot → Settings**, turn on **Lead capture** and customize the prompt shown in the widget.
+
+Inside **Dashboard → Bot → Leads**, owners can:
+
+- View captured leads with email, phone, company, request, and the latest related chat question.
+- Filter by status: **New**, **Contacted**, **Qualified**, or **Dismissed**.
+- Update status from the lead inbox.
+- Track lead totals, new leads, and qualified leads.
+
+Lead counts also appear in bot cards and analytics, including lead conversion rate from conversations to captured leads.
+
+### Data and API surface
+
+Lead capture adds:
+
+- `Lead` model with `NEW`, `CONTACTED`, `QUALIFIED`, and `DISMISSED` statuses.
+- Bot settings: `leadCaptureEnabled` and `leadCapturePrompt`.
+- Public endpoint: `POST /api/public/leads`.
+- Admin endpoint: `GET/PATCH /api/admin/bots/{botId}/leads`.
+- Migration: `prisma/migrations/20260528120000_add_lead_capture`.
+
+After pulling the latest `main`, run:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
+
+---
+
 ## Tech stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Lucide icons
@@ -123,6 +175,7 @@ Open **[http://localhost:3000](http://localhost:3000)**.
                        │  /embed/{publicKey}      │
                        └────────────┬─────────────┘
                                     │ POST /api/public/chat
+                                    │ POST /api/public/leads
                                     ▼
 ┌────────────────────────────────────────────────────────────┐
 │  Next.js (App Router)                                       │
@@ -132,8 +185,10 @@ Open **[http://localhost:3000](http://localhost:3000)**.
 │                          ▼                                  │
 │                    grounding check, source citations        │
 │                                                             │
+│  /api/public/leads ──► validated lead capture               │
+│                                                             │
 │  /api/admin/*      ──► auth-guarded admin endpoints         │
-│  /dashboard/*      ──► admin UI                             │
+│  /dashboard/*      ──► admin UI, analytics, lead inbox       │
 └────────────────────────────────────────────────────────────┘
                                     │
                   ┌─────────────────┴─────────────────┐
@@ -142,7 +197,8 @@ Open **[http://localhost:3000](http://localhost:3000)**.
          (User, Workspace, Bot,               (OpenAI / Anthropic /
           KnowledgeSource, Document,           Gemini / Groq / Ollama)
           DocumentChunk[vector],
-          Conversation, Message)
+          Conversation, Message,
+          Lead)
 ```
 
 ## Repository structure
@@ -153,15 +209,15 @@ app/
   (dashboard)/        Admin UI (workspace, bots, AI settings)
   api/auth/           Login, register, logout
   api/admin/          Workspace + bot CRUD, knowledge upload, chat preview,
-                      analytics, logs, suggested-questions
-  api/public/         Anonymous chat endpoint (keyed by publicKey)
+                      analytics, leads, logs, suggested-questions
+  api/public/         Anonymous chat + lead capture endpoints (keyed by publicKey)
   embed/[publicKey]/  Iframe-embeddable chat widget
   login/, register/   Auth pages
 
 components/
   ui/                 shadcn/ui design system
-  chat/               Public-facing chat widget + suggestion bubbles
-  dashboard/          Tabs: knowledge, preview, embed, analytics, logs, settings
+  chat/               Public-facing chat widget, lead form, suggestion bubbles
+  dashboard/          Tabs: knowledge, preview, embed, analytics, leads, logs, settings
   marketing/          Landing animations (FlowAnimation, DashboardMockup)
 
 lib/
@@ -175,7 +231,7 @@ lib/
 
 prisma/
   schema.prisma       All models
-  migrations/         4 migrations covering full schema
+  migrations/         Prepared migrations covering full schema
 
 public/
   widget.js           Drop-in script widget
@@ -232,6 +288,7 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 
 - All admin routes are guarded by a Next.js `proxy.ts` (formerly middleware) that checks the JWT cookie.
 - Public chat endpoints (`/api/public/*` and `/embed/*`) only accept a bot's `publicKey` — internal IDs are never exposed.
+- Public lead submissions are validated, rate-limited, and only accepted when lead capture is enabled for an active bot.
 - Per-workspace API keys are stored in the database; never sent to the client (masked in UI).
 - File uploads are MIME-type checked and size-capped (default 10 MB).
 - Basic rate-limiting structure is in place for public chat requests.
@@ -244,7 +301,7 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 - [ ] Full multi-page website crawler with depth limit
 - [ ] Google Drive integration (scaffold already in `lib/loaders/googledrive.ts`)
 - [ ] Slack / Teams bot integrations
-- [ ] Human-handoff + lead-capture forms
+- [ ] Human-handoff notifications and CRM exports
 - [ ] Multi-language chatbots
 - [ ] Advanced moderation + custom blocklists
 - [ ] White-label branding (custom domains, theme colors, fonts)

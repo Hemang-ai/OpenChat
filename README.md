@@ -46,6 +46,7 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 | Configurable fallback behavior + contact info | ✅ |
 | Auto-generated starter questions from your knowledge | ✅ |
 | Animated suggestion bubbles in the chat widget | ✅ |
+| Lead capture form + dashboard lead inbox | ✅ |
 | Admin chat preview with grounding badges + source citations | ✅ |
 | Public iframe embed (`/embed/{publicKey}`) | ✅ |
 | Drop-in `<script>` widget (`widget.js`) — floating chat bubble | ✅ |
@@ -98,7 +99,8 @@ Open **[http://localhost:3000](http://localhost:3000)**.
 3. **Dashboard → + New bot** → give it a name
 4. **Bot → Knowledge tab** → upload a PDF or paste manual text → wait for `COMPLETED`
 5. **Bot → Preview tab** → click a starter suggestion or ask a question
-6. **Bot → Embed tab** → copy the `<iframe>` or `<script>` snippet → paste into any website
+6. **Bot → Settings tab** → optionally enable lead capture for human follow-up
+7. **Bot → Embed tab** → copy the `<iframe>` or `<script>` snippet → paste into any website
 
 ---
 

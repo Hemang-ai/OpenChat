@@ -16,6 +16,8 @@ export async function GET(
       welcomeMessage: true,
       isActive: true,
       tone: true,
+      leadCaptureEnabled: true,
+      leadCapturePrompt: true,
     },
   });
 
@@ -37,6 +39,8 @@ export async function GET(
       isActive: bot.isActive,
       tone: bot.tone,
       suggestedQuestions,
+      leadCaptureEnabled: bot.leadCaptureEnabled,
+      leadCapturePrompt: bot.leadCapturePrompt,
     },
   });
 }

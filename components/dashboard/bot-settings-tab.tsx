@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,8 @@ const schema = z.object({
   strictness: z.enum(["strict", "balanced", "flexible"]),
   fallbackBehavior: z.enum(["contact", "general_knowledge", "ask_clarify"]),
   contactInfo: z.string().max(500).optional(),
+  leadCaptureEnabled: z.boolean(),
+  leadCapturePrompt: z.string().max(240).optional(),
   isActive: z.boolean(),
 });
 type FormData = z.infer<typeof schema>;
@@ -37,6 +40,8 @@ interface Props {
     strictness: string;
     fallbackBehavior?: string;
     contactInfo?: string | null;
+    leadCaptureEnabled: boolean;
+    leadCapturePrompt: string;
     isActive: boolean;
   };
 }
@@ -59,6 +64,8 @@ export default function BotSettingsTab({ bot }: Props) {
         : "balanced") as FormData["strictness"],
       fallbackBehavior: (bot.fallbackBehavior as FormData["fallbackBehavior"]) || "contact",
       contactInfo: bot.contactInfo || "",
+      leadCaptureEnabled: bot.leadCaptureEnabled,
+      leadCapturePrompt: bot.leadCapturePrompt || "Want us to follow up? Leave your details and our team will reach out.",
       isActive: bot.isActive,
     },
   });
@@ -132,8 +139,8 @@ export default function BotSettingsTab({ bot }: Props) {
           <div className="space-y-2">
             <Label>Answer mode (controls hallucination)</Label>
             <p className="text-xs text-gray-500">
-              When your bot answers <strong>“I don't have that information”</strong>, that's a <em>refusal</em> — it means
-              the question didn't match any chunks in your knowledge base. Loosening this lets the bot answer more, but increases the risk of inventing facts.
+              When your bot answers <strong>“I do not have that information”</strong>, that is a <em>refusal</em> - it means
+              the question did not match any chunks in your knowledge base. Loosening this lets the bot answer more, but increases the risk of inventing facts.
             </p>
             <div className="grid gap-2">
               {[
@@ -177,7 +184,7 @@ export default function BotSettingsTab({ bot }: Props) {
           </div>
 
           <div className="space-y-2 pt-2 border-t border-gray-100">
-            <Label>When the bot can't answer (fallback behavior)</Label>
+            <Label>When the bot cannot answer (fallback behavior)</Label>
             <p className="text-xs text-gray-500">
               How should the bot respond when the user asks something not in the knowledge base?
             </p>
@@ -192,13 +199,50 @@ export default function BotSettingsTab({ bot }: Props) {
           </div>
 
           <div className="space-y-1">
-            <Label>Contact info (shown when bot can't answer)</Label>
+            <Label>Contact info (shown when bot cannot answer)</Label>
             <Input {...register("contactInfo")} placeholder="e.g., support@acme.com or +1 555 0100" />
             <p className="text-xs text-gray-400">Optional. Replaces the generic “contact the business” phrasing.</p>
           </div>
           <div className="flex items-center gap-3">
             <input type="checkbox" id="isActive" {...register("isActive")} className="w-4 h-4 rounded" />
             <Label htmlFor="isActive">Bot is active (public embed will work)</Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-gray-500" />
+            <CardTitle className="text-base">Lead capture</CardTitle>
+          </div>
+          <CardDescription>Collect contact details from high-intent chat visitors</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer has-[:checked]:border-gray-900 has-[:checked]:bg-gray-50">
+            <input
+              type="checkbox"
+              {...register("leadCaptureEnabled")}
+              className="mt-1 w-4 h-4 rounded accent-gray-900"
+            />
+            <div>
+              <div className="font-medium text-sm text-gray-900">Show a follow-up form in the widget</div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Visitors can leave their email, phone, company, and request after chatting.
+              </p>
+            </div>
+          </label>
+
+          <div className="space-y-1">
+            <Label>Lead capture prompt</Label>
+            <Textarea
+              {...register("leadCapturePrompt")}
+              rows={2}
+              placeholder="Want us to follow up? Leave your details and our team will reach out."
+            />
+            {errors.leadCapturePrompt && (
+              <p className="text-xs text-red-500">{errors.leadCapturePrompt.message}</p>
+            )}
           </div>
         </CardContent>
       </Card>

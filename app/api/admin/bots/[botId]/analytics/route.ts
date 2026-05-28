@@ -15,7 +15,7 @@ export async function GET(
   });
   if (!bot) return NextResponse.json({ error: "Bot not found" }, { status: 404 });
 
-  const [totalConversations, messages, refusedMessages, recentConversations] =
+  const [totalConversations, messages, refusedMessages, totalLeads, newLeads, recentConversations] =
     await Promise.all([
       db.conversation.count({ where: { botId } }),
       db.message.findMany({
@@ -27,6 +27,8 @@ export async function GET(
       db.message.count({
         where: { conversation: { botId }, role: "ASSISTANT", isRefused: true },
       }),
+      db.lead.count({ where: { botId } }),
+      db.lead.count({ where: { botId, status: "NEW" } }),
       db.conversation.findMany({
         where: { botId },
         orderBy: { createdAt: "desc" },
@@ -50,6 +52,8 @@ export async function GET(
     totalConversations,
     totalMessages,
     refusedMessages,
+    totalLeads,
+    newLeads,
     topQuestions,
     recentConversations,
   });

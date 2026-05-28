@@ -27,7 +27,15 @@ export default async function EmbedPage({
 
   const bot = await db.bot.findUnique({
     where: { publicKey },
-    select: { id: true, name: true, welcomeMessage: true, isActive: true, suggestedQuestions: true },
+    select: {
+      id: true,
+      name: true,
+      welcomeMessage: true,
+      isActive: true,
+      suggestedQuestions: true,
+      leadCaptureEnabled: true,
+      leadCapturePrompt: true,
+    },
   });
 
   if (!bot || !bot.isActive) {
@@ -60,6 +68,8 @@ export default async function EmbedPage({
         botName={bot.name}
         welcomeMessage={bot.welcomeMessage}
         suggestedQuestions={suggestedQuestions}
+        leadCaptureEnabled={bot.leadCaptureEnabled}
+        leadCapturePrompt={bot.leadCapturePrompt}
       />
     </div>
   );

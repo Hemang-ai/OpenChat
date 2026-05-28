@@ -159,7 +159,7 @@ export default function DashboardMockup() {
                   <Bot className="w-2.5 h-2.5 text-gray-600" />
                 </div>
                 <div className="bg-white border border-gray-100 rounded-lg rounded-tl-sm px-2 py-1.5 text-[10px] text-gray-800 max-w-[85%]">
-                  Hi! I'm trained on Acme's docs. Ask me anything.
+                  Hi! I am trained on Acme&apos;s docs. Ask me anything.
                 </div>
               </div>
 
@@ -170,7 +170,7 @@ export default function DashboardMockup() {
                     <MessageSquare className="w-2.5 h-2.5 text-white" />
                   </div>
                   <div className="bg-gray-900 text-white rounded-lg rounded-tr-sm px-2 py-1.5 text-[10px] max-w-[85%]">
-                    What's the refund window?
+                    What&apos;s the refund window?
                   </div>
                 </div>
               )}

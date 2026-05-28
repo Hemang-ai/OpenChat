@@ -38,6 +38,8 @@ const updateSchema = z.object({
   strictness: z.enum(["strict", "balanced", "flexible", "moderate"]).optional(),
   fallbackBehavior: z.enum(["contact", "general_knowledge", "ask_clarify"]).optional(),
   contactInfo: z.string().max(500).optional().nullable(),
+  leadCaptureEnabled: z.boolean().optional(),
+  leadCapturePrompt: z.string().max(240).optional(),
   isActive: z.boolean().optional(),
 });
 

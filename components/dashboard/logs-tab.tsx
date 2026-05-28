@@ -35,17 +35,29 @@ export default function LogsTab({ botId }: { botId: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     fetch(`/api/admin/bots/${botId}/logs?page=${page}`)
       .then((r) => r.json())
-      .then((d) => setData(d))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [botId, page]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -142,11 +154,27 @@ export default function LogsTab({ botId }: { botId: string }) {
 
       {data.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => {
+              setLoading(true);
+              setPage(p => p - 1);
+            }}
+          >
             Previous
           </Button>
           <span className="text-sm text-gray-500">Page {page} of {data.totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage(p => p + 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= data.totalPages}
+            onClick={() => {
+              setLoading(true);
+              setPage(p => p + 1);
+            }}
+          >
             Next
           </Button>
         </div>

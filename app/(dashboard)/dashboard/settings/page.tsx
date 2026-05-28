@@ -132,7 +132,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">AI Configuration</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Each business workspace brings its own AI provider and keys. Pick a provider, paste a key, save — that's it.
+          Each business workspace brings its own AI provider and keys. Pick a provider, paste a key, save - that is it.
         </p>
       </div>
 
@@ -281,7 +281,7 @@ export default function SettingsPage() {
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2 text-sm">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div className="text-amber-800">
-                <strong>OpenAI key still required.</strong> Anthropic / Groq / Gemini don't offer embeddings,
+                <strong>OpenAI key still required.</strong> Anthropic / Groq / Gemini do not offer embeddings,
                 so we need an OpenAI key (just for indexing your knowledge). Switch to OpenAI tab and add it once.
               </div>
             </div>

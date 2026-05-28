@@ -40,7 +40,23 @@ export interface BotSettings {
   businessContext?: string | null;
   tone: string;
   strictness: string;
+  leadCaptureEnabled: boolean;
+  leadCapturePrompt: string;
   isActive: boolean;
+}
+
+export interface Lead {
+  id: string;
+  name?: string | null;
+  email: string;
+  phone?: string | null;
+  company?: string | null;
+  message?: string | null;
+  status: "NEW" | "CONTACTED" | "QUALIFIED" | "DISMISSED";
+  createdAt: string;
+  updatedAt: string;
+  botId: string;
+  conversationId?: string | null;
 }
 
 export interface WorkspaceWithBots {

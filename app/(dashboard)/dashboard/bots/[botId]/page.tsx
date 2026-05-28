@@ -9,6 +9,7 @@ import BotSettingsTab from "@/components/dashboard/bot-settings-tab";
 import EmbedTab from "@/components/dashboard/embed-tab";
 import ChatPreviewTab from "@/components/dashboard/chat-preview-tab";
 import AnalyticsTab from "@/components/dashboard/analytics-tab";
+import LeadsTab from "@/components/dashboard/leads-tab";
 import LogsTab from "@/components/dashboard/logs-tab";
 
 export default async function BotPage({ params }: { params: Promise<{ botId: string }> }) {
@@ -60,6 +61,7 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
           <TabsTrigger value="preview">Preview</TabsTrigger>
           <TabsTrigger value="embed">Embed</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="leads">Leads</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -80,6 +82,10 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
           <AnalyticsTab botId={bot.id} />
         </TabsContent>
 
+        <TabsContent value="leads">
+          <LeadsTab botId={bot.id} />
+        </TabsContent>
+
         <TabsContent value="logs">
           <LogsTab botId={bot.id} />
         </TabsContent>
@@ -96,6 +102,8 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
             strictness: bot.strictness,
             fallbackBehavior: bot.fallbackBehavior,
             contactInfo: bot.contactInfo,
+            leadCaptureEnabled: bot.leadCaptureEnabled,
+            leadCapturePrompt: bot.leadCapturePrompt,
             isActive: bot.isActive,
           }} />
         </TabsContent>

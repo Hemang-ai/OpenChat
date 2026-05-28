@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import CreateBotDialog from "@/components/dashboard/create-bot-dialog";
-import { Bot, MessageSquare, Plus, Settings } from "lucide-react";
+import { Bot, MessageSquare, Plus, Settings, UserPlus } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -18,7 +18,7 @@ export default async function DashboardPage() {
       bots: {
         orderBy: { createdAt: "desc" },
         include: {
-          _count: { select: { conversations: true, knowledgeSources: true } },
+          _count: { select: { conversations: true, knowledgeSources: true, leads: true } },
         },
       },
     },
@@ -90,6 +90,10 @@ export default async function DashboardPage() {
                       <span className="flex items-center gap-1">
                         <MessageSquare className="w-3 h-3" />
                         {bot._count.conversations} conversations
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <UserPlus className="w-3 h-3" />
+                        {bot._count.leads} leads
                       </span>
                       <span>{bot._count.knowledgeSources} sources</span>
                     </div>

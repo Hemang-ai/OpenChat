@@ -20,52 +20,55 @@ model User {
 }
 
 model Workspace {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  description          String?
   // Per-workspace AI configuration (each business uses its own keys)
-  llmProvider           String?  // primary: "openai" | "anthropic" | "groq" | "ollama" | "gemini"
-  fallbackLlmProvider   String?  // used if primary chat call fails
-  openaiApiKey          String?
-  openaiModel           String?
-  openaiEmbeddingModel  String?
-  anthropicApiKey       String?
-  anthropicModel        String?
-  groqApiKey            String?
-  groqModel             String?
-  ollamaBaseUrl         String?
-  ollamaModel           String?
-  geminiApiKey          String?
-  geminiModel           String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  bots        Bot[]
+  llmProvider          String? // primary: "openai" | "anthropic" | "groq" | "ollama" | "gemini"
+  fallbackLlmProvider  String? // used if primary chat call fails
+  openaiApiKey         String?
+  openaiModel          String?
+  openaiEmbeddingModel String?
+  anthropicApiKey      String?
+  anthropicModel       String?
+  groqApiKey           String?
+  groqModel            String?
+  ollamaBaseUrl        String?
+  ollamaModel          String?
+  geminiApiKey         String?
+  geminiModel          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ownerId              String
+  owner                User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bots                 Bot[]
 }
 
 model Bot {
-  id               String            @id @default(cuid())
-  name             String
-  description      String?
-  publicKey        String            @unique @default(cuid())
-  welcomeMessage   String            @default("Hello! How can I help you today?")
-  systemPrompt     String?
-  businessContext  String?
-  tone             String            @default("professional")
-  strictness       String            @default("strict") // "strict" | "balanced" | "flexible"
-  fallbackBehavior String            @default("contact") // "contact" | "general_knowledge" | "ask_clarify"
-  contactInfo      String?           // shown when bot can't answer
-  suggestedQuestions Json?           // cached starter questions auto-generated from knowledge
+  id                          String            @id @default(cuid())
+  name                        String
+  description                 String?
+  publicKey                   String            @unique @default(cuid())
+  welcomeMessage              String            @default("Hello! How can I help you today?")
+  systemPrompt                String?
+  businessContext             String?
+  tone                        String            @default("professional")
+  strictness                  String            @default("strict") // "strict" | "balanced" | "flexible"
+  fallbackBehavior            String            @default("contact") // "contact" | "general_knowledge" | "ask_clarify"
+  contactInfo                 String? // shown when bot can't answer
+  leadCaptureEnabled          Boolean           @default(false)
+  leadCapturePrompt           String            @default("Want us to follow up? Leave your details and our team will reach out.")
+  suggestedQuestions          Json? // cached starter questions auto-generated from knowledge
   suggestedQuestionsUpdatedAt DateTime?
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  workspaceId      String
-  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  knowledgeSources KnowledgeSource[]
-  conversations    Conversation[]
+  isActive                    Boolean           @default(true)
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+  workspaceId                 String
+  workspace                   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  knowledgeSources            KnowledgeSource[]
+  conversations               Conversation[]
+  leads                       Lead[]
 }
 
 model KnowledgeSource {
@@ -117,20 +120,40 @@ model Conversation {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
+  leads     Lead[]
   userAgent String?
   ipAddress String?
 }
 
 model Message {
-  id             String      @id @default(cuid())
+  id             String       @id @default(cuid())
   role           MessageRole
   content        String
   isGrounded     Boolean?
   isRefused      Boolean?
   sourceChunkIds String[]
-  createdAt      DateTime    @default(now())
+  createdAt      DateTime     @default(now())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Lead {
+  id             String        @id @default(cuid())
+  name           String?
+  email          String
+  phone          String?
+  company        String?
+  message        String?
+  status         LeadStatus    @default(NEW)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  botId          String
+  bot            Bot           @relation(fields: [botId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([botId, status])
+  @@index([conversationId])
 }
 
 enum SourceType {
@@ -151,4 +174,11 @@ enum IngestionStatus {
 enum MessageRole {
   USER
   ASSISTANT
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DISMISSED
 }

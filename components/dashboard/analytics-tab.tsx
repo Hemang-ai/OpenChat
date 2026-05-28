@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { MessageSquare, Users, ThumbsDown, TrendingUp } from "lucide-react";
+import { MessageSquare, Users, ThumbsDown, TrendingUp, UserPlus, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Analytics {
   totalConversations: number;
   totalMessages: number;
   refusedMessages: number;
+  totalLeads: number;
+  newLeads: number;
   topQuestions: string[];
 }
 
@@ -41,12 +43,18 @@ export default function AnalyticsTab({ botId }: { botId: string }) {
   const groundRate = data.totalMessages > 0
     ? Math.round(((data.totalMessages - data.refusedMessages) / data.totalMessages) * 100)
     : 0;
+  const leadConversionRate = data.totalConversations > 0
+    ? Math.round((data.totalLeads / data.totalConversations) * 100)
+    : 0;
 
   const stats = [
     { label: "Conversations", value: data.totalConversations, icon: Users, color: "text-blue-600" },
     { label: "Total messages", value: data.totalMessages, icon: MessageSquare, color: "text-green-600" },
     { label: "Refused answers", value: data.refusedMessages, icon: ThumbsDown, color: "text-orange-500" },
     { label: "Grounded rate", value: `${groundRate}%`, icon: TrendingUp, color: "text-purple-600" },
+    { label: "Leads captured", value: data.totalLeads, icon: UserPlus, color: "text-cyan-600" },
+    { label: "New leads", value: data.newLeads, icon: Clock, color: "text-amber-600" },
+    { label: "Lead conversion", value: `${leadConversionRate}%`, icon: TrendingUp, color: "text-emerald-600" },
   ];
 
   return (

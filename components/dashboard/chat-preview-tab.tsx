@@ -1,11 +1,19 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, BookOpen, CheckCircle, XCircle } from "lucide-react";
+import { Send, Bot, User, BookOpen, CheckCircle, XCircle, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import SuggestedBubbles from "@/components/chat/suggested-bubbles";
+
+interface ToolCallBadge {
+  name: string;
+  input: Record<string, unknown>;
+  output: unknown;
+  status: "success" | "error" | "rejected";
+  latencyMs: number;
+}
 
 interface Message {
   id: string;
@@ -14,6 +22,7 @@ interface Message {
   isGrounded?: boolean;
   isRefused?: boolean;
   sources?: Array<{ id: string; content: string; documentTitle?: string | null }>;
+  toolCalls?: ToolCallBadge[];
 }
 
 interface Props {
@@ -88,6 +97,7 @@ export default function ChatPreviewTab({ bot }: Props) {
           isGrounded: data.isGrounded,
           isRefused: data.isRefused,
           sources: data.sources,
+          toolCalls: Array.isArray(data.toolCalls) ? data.toolCalls : undefined,
         },
       ]);
     } catch (err) {
@@ -168,6 +178,40 @@ export default function ChatPreviewTab({ bot }: Props) {
                         {msg.sources.length} source{msg.sources.length > 1 ? "s" : ""}
                       </button>
                     )}
+                    {msg.toolCalls && msg.toolCalls.length > 0 && (
+                      <span className="text-xs text-purple-600 flex items-center gap-1">
+                        <Wrench className="w-3 h-3" />
+                        {msg.toolCalls.length} action{msg.toolCalls.length > 1 ? "s" : ""} taken
+                      </span>
+                    )}
+                  </div>
+                )}
+                {msg.toolCalls && msg.toolCalls.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {msg.toolCalls.map((tc, i) => (
+                      <Card key={i} className="border-purple-200 bg-purple-50/30">
+                        <CardContent className="p-2.5">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Wrench className="w-3 h-3 text-purple-600" />
+                            <code className="text-xs font-mono font-semibold text-purple-900">{tc.name}</code>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              tc.status === "success" ? "bg-green-100 text-green-700" :
+                              tc.status === "error" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
+                            }`}>
+                              {tc.status}
+                            </span>
+                            <span className="text-[10px] text-gray-400">{tc.latencyMs}ms</span>
+                          </div>
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-gray-500">View call details</summary>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              <pre className="bg-white p-2 rounded text-[10px] overflow-x-auto max-h-32">{JSON.stringify(tc.input, null, 2)}</pre>
+                              <pre className="bg-white p-2 rounded text-[10px] overflow-x-auto max-h-32">{JSON.stringify(tc.output, null, 2)}</pre>
+                            </div>
+                          </details>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
                 {expandedSources.has(msg.id) && msg.sources && (

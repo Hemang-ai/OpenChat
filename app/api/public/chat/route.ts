@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
-import { chatWithBot } from "@/lib/rag/chat";
+import { agenticChat } from "@/lib/agents/agent-chat";
 import {
   getClientIp,
   getPublicChatRateLimitConfig,
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       data: { conversationId: conversation.id, role: "USER", content: message },
     });
 
-    const result = await chatWithBot(bot.id, message, history);
+    const result = await agenticChat(bot.id, message, conversation.id, history);
 
     await db.message.create({
       data: {

@@ -11,6 +11,7 @@ import ChatPreviewTab from "@/components/dashboard/chat-preview-tab";
 import AnalyticsTab from "@/components/dashboard/analytics-tab";
 import LeadsTab from "@/components/dashboard/leads-tab";
 import LogsTab from "@/components/dashboard/logs-tab";
+import ToolsTab from "@/components/dashboard/tools-tab";
 
 export default async function BotPage({ params }: { params: Promise<{ botId: string }> }) {
   const session = await getSession();
@@ -58,6 +59,7 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
       <Tabs defaultValue="knowledge">
         <TabsList className="mb-6 flex-wrap h-auto gap-1">
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
+          <TabsTrigger value="tools">⚡ Tools</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
           <TabsTrigger value="embed">Embed</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -68,6 +70,10 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
 
         <TabsContent value="knowledge">
           <KnowledgeTab bot={{ id: bot.id, name: bot.name }} sources={bot.knowledgeSources} />
+        </TabsContent>
+
+        <TabsContent value="tools">
+          <ToolsTab botId={bot.id} />
         </TabsContent>
 
         <TabsContent value="preview">

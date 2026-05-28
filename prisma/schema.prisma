@@ -69,6 +69,7 @@ model Bot {
   knowledgeSources            KnowledgeSource[]
   conversations               Conversation[]
   leads                       Lead[]
+  tools                       Tool[]
 }
 
 model KnowledgeSource {
@@ -121,6 +122,7 @@ model Conversation {
   updatedAt DateTime  @updatedAt
   messages  Message[]
   leads     Lead[]
+  toolExecutions ToolExecution[]
   userAgent String?
   ipAddress String?
 }
@@ -181,4 +183,65 @@ enum LeadStatus {
   CONTACTED
   QUALIFIED
   DISMISSED
+}
+
+// ============================================================================
+// Agentic actions — Tools + Tool execution log
+// ============================================================================
+
+model Tool {
+  id            String           @id @default(cuid())
+  botId         String
+  bot           Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name          String           // function name exposed to the LLM (snake_case)
+  description   String           // shown to LLM so it knows when to use the tool
+  // JSON Schema describing the tool's input parameters (OpenAI-compatible)
+  inputSchema   Json
+  kind          ToolKind         @default(HTTP_REQUEST)
+  // HTTP-specific config (kind = HTTP_REQUEST)
+  method        String?          @default("POST") // GET / POST / PUT / PATCH / DELETE
+  endpoint      String?          // URL with optional {placeholders} for inputs
+  headers       Json?            // map of static request headers (include auth)
+  // Approval gating: AUTO runs immediately; REQUIRE_CONFIRM surfaces for user approval
+  approvalMode  ToolApprovalMode @default(AUTO)
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  executions    ToolExecution[]
+
+  @@index([botId])
+}
+
+model ToolExecution {
+  id             String              @id @default(cuid())
+  toolId         String
+  tool           Tool                @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  input          Json
+  output         Json?
+  errorMessage   String?
+  status         ToolExecutionStatus @default(SUCCESS)
+  latencyMs      Int?
+  createdAt      DateTime            @default(now())
+
+  @@index([toolId])
+  @@index([conversationId])
+}
+
+enum ToolKind {
+  HTTP_REQUEST  // generic outbound HTTP call (covers 90% of integrations)
+  BUILTIN       // reserved for first-party integrations later (e.g. send_email)
+}
+
+enum ToolApprovalMode {
+  AUTO            // run immediately when LLM requests it
+  REQUIRE_CONFIRM // pause and ask the user (preview UI flag)
+}
+
+enum ToolExecutionStatus {
+  SUCCESS
+  ERROR
+  PENDING_APPROVAL
+  REJECTED
 }

@@ -1,4 +1,5 @@
 import { resolveModel } from "./models";
+import type { AgentMessage, AgentTurn, ToolDef } from "@/lib/agents/types";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -8,6 +9,12 @@ export interface LLMMessage {
 export interface LLMProvider {
   chat(messages: LLMMessage[]): Promise<string>;
   embed(text: string): Promise<number[]>;
+  /**
+   * Agentic chat with optional tool calling. Returns either free text OR a
+   * list of tool calls to execute. The caller is responsible for the loop.
+   * Providers without native tool support strip tools and respond with text.
+   */
+  chatAgent(messages: AgentMessage[], tools?: ToolDef[]): Promise<AgentTurn>;
 }
 
 export interface AIConfig {
@@ -54,6 +61,53 @@ class OpenAIProvider implements LLMProvider {
     const data = await res.json();
     return data.data[0].embedding;
   }
+
+  async chatAgent(messages: AgentMessage[], tools: ToolDef[] = []): Promise<AgentTurn> {
+    // Map AgentMessage → OpenAI messages with tool_calls + tool role support
+    const oaiMessages = messages.map((m) => {
+      if (m.role === "tool") {
+        return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+      }
+      if (m.role === "assistant" && m.toolCalls?.length) {
+        return {
+          role: "assistant",
+          content: m.content || "",
+          tool_calls: m.toolCalls.map((tc) => ({
+            id: tc.id,
+            type: "function",
+            function: { name: tc.name, arguments: JSON.stringify(tc.input) },
+          })),
+        };
+      }
+      return { role: m.role, content: (m as { content: string }).content };
+    });
+
+    const body: Record<string, unknown> = { model: this.model, messages: oaiMessages };
+    if (tools.length > 0) {
+      body.tools = tools.map((t) => ({
+        type: "function",
+        function: { name: t.name, description: t.description, parameters: t.parameters },
+      }));
+    }
+
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`OpenAI error: ${await res.text()}`);
+    const data = await res.json();
+    const msg = data.choices[0]?.message || {};
+    const text = msg.content || "";
+    const toolCalls = Array.isArray(msg.tool_calls)
+      ? msg.tool_calls.map((tc: { id: string; function: { name: string; arguments: string } }) => {
+          let input: Record<string, unknown> = {};
+          try { input = JSON.parse(tc.function.arguments || "{}"); } catch { /* leave empty */ }
+          return { id: tc.id, name: tc.function.name, input };
+        })
+      : [];
+    return { done: toolCalls.length === 0, text, toolCalls };
+  }
 }
 
 class AnthropicProvider implements LLMProvider {
@@ -71,6 +125,59 @@ class AnthropicProvider implements LLMProvider {
     return data.content[0].text;
   }
   embed(text: string): Promise<number[]> { return this.embedFallback.embed(text); }
+
+  async chatAgent(messages: AgentMessage[], tools: ToolDef[] = []): Promise<AgentTurn> {
+    const system = messages.find((m) => m.role === "system")?.content;
+    // Anthropic uses `content` arrays per message; tool_result must wrap in user role.
+    const anthropicMessages = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => {
+        if (m.role === "tool") {
+          return {
+            role: "user",
+            content: [{ type: "tool_result", tool_use_id: m.toolCallId, content: m.content }],
+          };
+        }
+        if (m.role === "assistant" && m.toolCalls?.length) {
+          const content: Array<Record<string, unknown>> = [];
+          if (m.content) content.push({ type: "text", text: m.content });
+          for (const tc of m.toolCalls) {
+            content.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.input });
+          }
+          return { role: "assistant", content };
+        }
+        return { role: m.role, content: (m as { content: string }).content };
+      });
+
+    const body: Record<string, unknown> = {
+      model: this.model,
+      max_tokens: 1024,
+      system,
+      messages: anthropicMessages,
+    };
+    if (tools.length > 0) {
+      body.tools = tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.parameters,
+      }));
+    }
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": this.apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Anthropic error: ${await res.text()}`);
+    const data = await res.json();
+    const blocks: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }> =
+      data.content || [];
+    const text = blocks.filter((b) => b.type === "text").map((b) => b.text || "").join("");
+    const toolCalls = blocks
+      .filter((b) => b.type === "tool_use")
+      .map((b) => ({ id: b.id || "", name: b.name || "", input: b.input || {} }));
+    return { done: toolCalls.length === 0, text, toolCalls };
+  }
 }
 
 class GroqProvider implements LLMProvider {
@@ -86,6 +193,9 @@ class GroqProvider implements LLMProvider {
     return data.choices[0].message.content;
   }
   embed(text: string): Promise<number[]> { return this.embedFallback.embed(text); }
+  async chatAgent(messages: AgentMessage[]): Promise<AgentTurn> {
+    return basicAgentFromChat((m) => this.chat(m), messages);
+  }
 }
 
 class GeminiProvider implements LLMProvider {
@@ -112,6 +222,9 @@ class GeminiProvider implements LLMProvider {
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
   embed(text: string): Promise<number[]> { return this.embedFallback.embed(text); }
+  async chatAgent(messages: AgentMessage[]): Promise<AgentTurn> {
+    return basicAgentFromChat((m) => this.chat(m), messages);
+  }
 }
 
 class OllamaProvider implements LLMProvider {
@@ -136,6 +249,28 @@ class OllamaProvider implements LLMProvider {
     const data = await res.json();
     return data.embedding;
   }
+  async chatAgent(messages: AgentMessage[]): Promise<AgentTurn> {
+    return basicAgentFromChat((m) => this.chat(m), messages);
+  }
+}
+
+/**
+ * Adapter: lets a text-only provider satisfy the AgentTurn interface by
+ * dropping any tool calls and producing only text. Used for Groq/Gemini/Ollama
+ * until they get native tool-calling adapters.
+ */
+async function basicAgentFromChat(
+  chatFn: (messages: LLMMessage[]) => Promise<string>,
+  messages: AgentMessage[]
+): Promise<AgentTurn> {
+  const plain: LLMMessage[] = messages
+    .filter((m) => m.role === "system" || m.role === "user" || m.role === "assistant")
+    .map((m) => ({
+      role: m.role as "system" | "user" | "assistant",
+      content: (m as { content: string }).content || "",
+    }));
+  const text = await chatFn(plain);
+  return { done: true, text, toolCalls: [] };
 }
 
 /**
@@ -154,6 +289,14 @@ class FallbackProvider implements LLMProvider {
   }
   embed(text: string): Promise<number[]> {
     return this.primary.embed(text);
+  }
+  async chatAgent(messages: AgentMessage[], tools?: ToolDef[]): Promise<AgentTurn> {
+    try {
+      return await this.primary.chatAgent(messages, tools);
+    } catch (err) {
+      console.warn("Primary LLM (agent) failed, using fallback:", err instanceof Error ? err.message : err);
+      return this.fallback.chatAgent(messages, tools);
+    }
   }
 }
 

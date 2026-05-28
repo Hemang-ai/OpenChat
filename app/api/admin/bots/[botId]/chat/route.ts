@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/jwt";
 import { db } from "@/lib/db/client";
-import { chatWithBot } from "@/lib/rag/chat";
+import { agenticChat } from "@/lib/agents/agent-chat";
 
 const chatSchema = z.object({
   message: z.string().min(1).max(2000),
@@ -51,7 +51,7 @@ export async function POST(
       data: { conversationId: conversation.id, role: "USER", content: message },
     });
 
-    const result = await chatWithBot(botId, message, history);
+    const result = await agenticChat(botId, message, conversation.id, history);
 
     await db.message.create({
       data: {
@@ -70,6 +70,7 @@ export async function POST(
       isGrounded: result.isGrounded,
       isRefused: result.isRefused,
       sources: includeSources ? result.sources : undefined,
+      toolCalls: result.toolCalls,
     });
   } catch (err) {
     if (err instanceof z.ZodError) {

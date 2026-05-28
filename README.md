@@ -7,7 +7,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791)](https://github.com/pgvector/pgvector)
 
-> **🎉 v0.1.0 — Feature complete. All 4 phased commits shipped.**
+> **⚡ v0.2.0 — Agentic actions are live.** Your bot can now DO things — look up orders, create tickets, query your APIs, send notifications. Tools work with OpenAI & Anthropic function-calling.
 > Self-hostable in minutes. Bring your own AI keys. MIT licensed.
 
 ---
@@ -17,6 +17,7 @@
 OpenBusinessChat lets any business create a custom AI chatbot trained **only on their own knowledge** — and embed it on any website with a single line of code. No hallucinations, no vendor lock-in, no usage limits.
 
 - **Upload knowledge** — PDFs, Word docs, TXT, CSV, Markdown, website URLs, YouTube transcripts, manual text
+- **Take action with tools** — call your APIs, look up orders, create tickets, send emails — your bot decides when to use them
 - **RAG-grounded answers** — pgvector retrieval, configurable strictness, source citations
 - **Embed anywhere** — `<iframe>` or one-line `<script>` widget
 - **Capture leads from chat** — optional visitor follow-up form plus a dashboard lead inbox
@@ -54,6 +55,9 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 | Conversation logs viewer | ✅ |
 | Analytics: totals, unknown-answer rate, top user questions | ✅ |
 | Animated end-to-end flow demo on the landing page | ✅ |
+| **Agentic tools** — bot calls HTTP APIs via function-calling (OpenAI + Anthropic) | ✅ |
+| **Tool execution log** with input/output, latency, status per invocation | ✅ |
+| **Approval gating** — tools can require user confirmation before running | ✅ |
 | MIT licensed, fully self-hostable | ✅ |
 
 ---

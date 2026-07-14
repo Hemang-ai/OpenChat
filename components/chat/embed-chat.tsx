@@ -199,7 +199,7 @@ export default function EmbedChat({
                   <button
                     type="button"
                     onClick={() => setLeadFormOpen(true)}
-                    className="h-9 w-full rounded-lg bg-gray-900 px-3 text-xs font-medium text-white hover:bg-gray-700 transition-colors"
+                    className="min-h-11 w-full rounded-lg bg-gray-900 px-3 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
                   >
                     Leave contact details
                   </button>
@@ -217,7 +217,7 @@ export default function EmbedChat({
                         setLeadFormOpen(false);
                         setLeadError("");
                       }}
-                      className="w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+                      className="w-11 h-11 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center"
                       aria-label="Close contact form"
                     >
                       <X className="w-4 h-4" />
@@ -228,13 +228,13 @@ export default function EmbedChat({
                       value={leadData.name}
                       onChange={(e) => updateLeadField("name", e.target.value)}
                       placeholder="Name"
-                      className="min-w-0 h-9 rounded-lg border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="min-w-0 min-h-11 rounded-lg border border-gray-200 px-3 text-base focus:outline-none focus:ring-2 focus:ring-gray-900"
                     />
                     <input
                       value={leadData.company}
                       onChange={(e) => updateLeadField("company", e.target.value)}
                       placeholder="Company"
-                      className="min-w-0 h-9 rounded-lg border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="min-w-0 min-h-11 rounded-lg border border-gray-200 px-3 text-base focus:outline-none focus:ring-2 focus:ring-gray-900"
                     />
                   </div>
                   <input
@@ -242,26 +242,26 @@ export default function EmbedChat({
                     value={leadData.email}
                     onChange={(e) => updateLeadField("email", e.target.value)}
                     placeholder="Email *"
-                    className="h-9 w-full rounded-lg border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="min-h-11 w-full rounded-lg border border-gray-200 px-3 text-base focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                   <input
                     value={leadData.phone}
                     onChange={(e) => updateLeadField("phone", e.target.value)}
                     placeholder="Phone"
-                    className="h-9 w-full rounded-lg border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="min-h-11 w-full rounded-lg border border-gray-200 px-3 text-base focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                   <textarea
                     value={leadData.message}
                     onChange={(e) => updateLeadField("message", e.target.value)}
                     placeholder="What should we help with?"
                     rows={2}
-                    className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                   {leadError && <p className="text-xs text-red-500">{leadError}</p>}
                   <button
                     type="submit"
                     disabled={leadSubmitting}
-                    className="h-9 w-full rounded-lg bg-gray-900 px-3 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                    className="min-h-11 w-full rounded-lg bg-gray-900 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
                   >
                     {leadSubmitting ? "Sending..." : "Send to team"}
                   </button>
@@ -299,7 +299,7 @@ export default function EmbedChat({
           <button
             type="button"
             onClick={() => setHideSuggestions(true)}
-            className="absolute top-2 right-2 w-6 h-6 rounded-md text-gray-300 hover:text-gray-600 hover:bg-white flex items-center justify-center z-10"
+            className="absolute top-1 right-1 w-11 h-11 rounded-md text-gray-400 hover:text-gray-700 hover:bg-white flex items-center justify-center z-10"
             aria-label="Hide suggestions"
           >
             <X className="w-3.5 h-3.5" />
@@ -323,18 +323,19 @@ export default function EmbedChat({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type a message..."
             disabled={loading}
-            className="flex-1 h-10 px-3 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            className="flex-1 min-h-11 min-w-0 px-3 text-base rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="w-10 h-10 bg-gray-900 text-white rounded-lg flex items-center justify-center hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-11 h-11 bg-gray-900 text-white rounded-lg flex items-center justify-center hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Send message"
           >
             <Send className="w-4 h-4" />
           </button>
         </form>
         <p className="text-center text-xs text-gray-400 mt-2">
-          Powered by <a href="https://github.com/openbusinesschat" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600">OpenBusinessChat</a>
+          Powered by <a href="https://github.com/Hemang-ai/OpenChat" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600">OpenBusinessChat</a>
         </p>
       </div>
     </div>

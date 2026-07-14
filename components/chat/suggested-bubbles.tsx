@@ -58,10 +58,10 @@ export default function SuggestedBubbles({
               animationFillMode: "backwards",
             }}
             className="group relative overflow-hidden inline-flex items-center gap-1.5 max-w-full
-                       px-3.5 py-1.5 rounded-full
+                       min-h-11 px-3.5 py-2 rounded-full
                        bg-white/70 backdrop-blur-sm
                        border border-gray-200/70 hover:border-blue-400 hover:bg-white
-                       text-xs text-gray-700 hover:text-blue-700
+                       text-sm text-gray-700 hover:text-blue-700
                        transition-all duration-200
                        hover:-translate-y-0.5
                        animate-in fade-in slide-in-from-bottom-2 zoom-in-95"

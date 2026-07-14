@@ -49,6 +49,19 @@ export async function agenticChat(
   const tools = await db.tool.findMany({ where: { botId, isActive: true } });
   const toolDefs = tools.map(toolToFunctionDef);
 
+  // Grounding is enforced in code, not delegated only to prompt compliance.
+  // Without matching knowledge or an action capable of retrieving live data,
+  // the model must never get an opportunity to answer from outside knowledge.
+  if (relevant.length === 0 && tools.length === 0) {
+    return {
+      answer: REFUSAL,
+      isGrounded: false,
+      isRefused: true,
+      sources: [],
+      toolCalls: [],
+    };
+  }
+
   // 3. Build the system prompt — RAG context + tool guidance
   const context = relevant.length
     ? relevant.map((c, i) => `[Source ${i + 1}]: ${c.content}`).join("\n\n")

@@ -305,22 +305,22 @@ function buildSingleProvider(name: string, config: AIConfig, openaiProvider: Ope
     case "anthropic": {
       const key = resolve(config.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
       const model = resolveModel("anthropic", resolve(config.anthropicModel, process.env.ANTHROPIC_MODEL));
-      if (!key) throw new Error("Anthropic API key not configured.");
-      if (!openaiProvider) throw new Error("OpenAI key required for embeddings.");
+      if (!key) throw new Error("Anthropic API key is not configured. Add it in AI Settings.");
+      if (!openaiProvider) throw new Error("An OpenAI API key is required for embeddings when Anthropic is selected. Add it in AI Settings.");
       return new AnthropicProvider(key, model, openaiProvider);
     }
     case "groq": {
       const key = resolve(config.groqApiKey, process.env.GROQ_API_KEY);
       const model = resolveModel("groq", resolve(config.groqModel, process.env.GROQ_MODEL));
-      if (!key) throw new Error("Groq API key not configured.");
-      if (!openaiProvider) throw new Error("OpenAI key required for embeddings.");
+      if (!key) throw new Error("Groq API key is not configured. Add it in AI Settings.");
+      if (!openaiProvider) throw new Error("An OpenAI API key is required for embeddings when Groq is selected. Add it in AI Settings.");
       return new GroqProvider(key, model, openaiProvider);
     }
     case "gemini": {
       const key = resolve(config.geminiApiKey, process.env.GEMINI_API_KEY);
       const model = resolveModel("gemini", resolve(config.geminiModel, process.env.GEMINI_MODEL));
-      if (!key) throw new Error("Gemini API key not configured.");
-      if (!openaiProvider) throw new Error("OpenAI key required for embeddings.");
+      if (!key) throw new Error("Gemini API key is not configured. Add it in AI Settings.");
+      if (!openaiProvider) throw new Error("An OpenAI API key is required for embeddings when Gemini is selected. Add it in AI Settings.");
       return new GeminiProvider(key, model, openaiProvider);
     }
     case "ollama": {
@@ -330,7 +330,7 @@ function buildSingleProvider(name: string, config: AIConfig, openaiProvider: Ope
     }
     case "openai":
     default: {
-      if (!openaiProvider) throw new Error("OpenAI API key not configured.");
+      if (!openaiProvider) throw new Error("OpenAI API key is not configured. Add it in AI Settings before adding knowledge.");
       return openaiProvider;
     }
   }

@@ -25,6 +25,7 @@ interface MemoryEntry {
 }
 
 const memoryStore = new Map<string, MemoryEntry>();
+let warnedAboutMemoryFallback = false;
 
 function hashKey(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 40);
@@ -43,7 +44,7 @@ function getUpstashConfig() {
 }
 
 function shouldUseMemoryFallback(): boolean {
-  return process.env.NODE_ENV !== "production";
+  return process.env.NODE_ENV !== "production" || process.env.RATE_LIMIT_REQUIRE_DISTRIBUTED !== "true";
 }
 
 function shouldFailOpen(): boolean {
@@ -113,6 +114,12 @@ function rateLimitWithMemory(options: RateLimitOptions): RateLimitResult {
   const now = Date.now();
   const existing = memoryStore.get(key);
 
+  if (memoryStore.size > 10_000) {
+    for (const [storedKey, entry] of memoryStore) {
+      if (now > entry.resetAt) memoryStore.delete(storedKey);
+    }
+  }
+
   if (!existing || now > existing.resetAt) {
     const resetAt = now + options.windowSeconds * 1000;
 
@@ -158,6 +165,13 @@ export async function rateLimit(options: RateLimitOptions): Promise<RateLimitRes
     }
 
     if (shouldUseMemoryFallback()) {
+      if (process.env.NODE_ENV === "production" && !warnedAboutMemoryFallback) {
+        warnedAboutMemoryFallback = true;
+        console.warn(
+          "Upstash Redis is not configured; using per-instance rate limiting. " +
+          "Set RATE_LIMIT_REQUIRE_DISTRIBUTED=true to fail closed instead."
+        );
+      }
       return rateLimitWithMemory(options);
     }
 

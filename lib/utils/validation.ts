@@ -9,12 +9,19 @@ export const ALLOWED_MIME_TYPES = [
 
 export const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt", ".md", ".csv"];
 
+const MIME_TYPES_BY_EXTENSION: Record<string, string[]> = {
+  ".pdf": ["application/pdf"],
+  ".docx": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  ".txt": ["text/plain"],
+  ".md": ["text/markdown", "text/x-markdown", "text/plain"],
+  ".csv": ["text/csv", "application/csv", "application/vnd.ms-excel", "text/plain"],
+};
+
 export function isAllowedFile(filename: string, mimeType: string): boolean {
   const ext = filename.substring(filename.lastIndexOf(".")).toLowerCase();
-  return (
-    ALLOWED_EXTENSIONS.includes(ext) ||
-    ALLOWED_MIME_TYPES.includes(mimeType)
-  );
+  if (!ALLOWED_EXTENSIONS.includes(ext)) return false;
+  if (!mimeType || mimeType === "application/octet-stream") return true;
+  return MIME_TYPES_BY_EXTENSION[ext]?.includes(mimeType) ?? false;
 }
 
 export function getMaxFileSizeBytes(): number {

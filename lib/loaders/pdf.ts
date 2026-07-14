@@ -1,4 +1,5 @@
 import fs from "fs";
+import { PDFParse } from "pdf-parse";
 
 /**
  * Extract text from a PDF file using pdf-parse v2 API.
@@ -8,11 +9,10 @@ export async function extractPdfText(filePath: string): Promise<string> {
   if (!fs.existsSync(filePath)) {
     throw new Error(`PDF file not found: ${filePath}`);
   }
-  const buffer = fs.readFileSync(filePath);
+  return extractPdfTextFromBuffer(fs.readFileSync(filePath));
+}
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require("pdf-parse");
-  const PDFParse = mod.PDFParse || mod.default?.PDFParse || mod.default || mod;
+export async function extractPdfTextFromBuffer(buffer: Buffer): Promise<string> {
 
   try {
     const parser = new PDFParse({ data: buffer });

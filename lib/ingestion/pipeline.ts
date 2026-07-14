@@ -1,14 +1,22 @@
 import { db } from "@/lib/db/client";
 import { getLLMProvider, getAIConfigForBot } from "@/lib/ai/provider";
 import { chunkText } from "./chunker";
-import { extractPdfText } from "@/lib/loaders/pdf";
-import { extractDocxText } from "@/lib/loaders/docx";
+import { extractPdfText, extractPdfTextFromBuffer } from "@/lib/loaders/pdf";
+import { extractDocxText, extractDocxTextFromBuffer } from "@/lib/loaders/docx";
 import { extractWebsiteText } from "@/lib/loaders/website";
 import { extractYouTubeTranscript } from "@/lib/loaders/youtube";
 import path from "path";
 import fs from "fs";
 
-export async function ingestKnowledgeSource(sourceId: string): Promise<void> {
+interface IngestionInput {
+  fileBuffer?: Buffer;
+  fileName?: string;
+}
+
+export async function ingestKnowledgeSource(
+  sourceId: string,
+  input: IngestionInput = {}
+): Promise<void> {
   const source = await db.knowledgeSource.findUnique({
     where: { id: sourceId },
   });
@@ -23,16 +31,22 @@ export async function ingestKnowledgeSource(sourceId: string): Promise<void> {
     let text = "";
     let title = source.name;
 
+    // Resolve the embedding provider before extraction so configuration errors
+    // are returned quickly and do not leave a source stuck in PROCESSING.
+    const aiConfig = await getAIConfigForBot(source.botId);
+    const provider = getLLMProvider(aiConfig);
+
     switch (source.type) {
       case "FILE": {
-        if (!source.filePath) throw new Error("No file path");
-        const ext = path.extname(source.filePath).toLowerCase();
+        const ext = path.extname(input.fileName || source.name || source.filePath || "").toLowerCase();
+        const buffer = input.fileBuffer;
+        if (!buffer && !source.filePath) throw new Error("The uploaded file is no longer available. Please upload it again.");
         if (ext === ".pdf") {
-          text = await extractPdfText(source.filePath);
+          text = buffer ? await extractPdfTextFromBuffer(buffer) : await extractPdfText(source.filePath!);
         } else if (ext === ".docx") {
-          text = await extractDocxText(source.filePath);
+          text = buffer ? await extractDocxTextFromBuffer(buffer) : await extractDocxText(source.filePath!);
         } else if ([".txt", ".md", ".csv"].includes(ext)) {
-          text = fs.readFileSync(source.filePath, "utf-8");
+          text = buffer ? buffer.toString("utf-8") : fs.readFileSync(source.filePath!, "utf-8");
         } else {
           throw new Error(`Unsupported file type: ${ext}`);
         }
@@ -63,6 +77,8 @@ export async function ingestKnowledgeSource(sourceId: string): Promise<void> {
       throw new Error("Extracted text is empty or too short");
     }
 
+    await db.document.deleteMany({ where: { knowledgeSourceId: sourceId } });
+
     const document = await db.document.create({
       data: {
         title,
@@ -72,9 +88,6 @@ export async function ingestKnowledgeSource(sourceId: string): Promise<void> {
     });
 
     const chunks = chunkText(text);
-    const aiConfig = await getAIConfigForBot(source.botId);
-    const provider = getLLMProvider(aiConfig);
-
     // Process embeddings in batches
     const BATCH = 10;
     for (let i = 0; i < chunks.length; i += BATCH) {
@@ -111,18 +124,18 @@ export async function ingestKnowledgeSource(sourceId: string): Promise<void> {
       },
     });
 
-    // Refresh starter questions in the background (don't block ingestion completion)
-    import("@/lib/rag/suggested-questions").then((m) =>
-      m.generateSuggestedQuestions(source.botId).catch((e) =>
-        console.warn("Failed to refresh suggested questions:", e)
-      )
-    );
+    try {
+      const { generateSuggestedQuestions } = await import("@/lib/rag/suggested-questions");
+      await generateSuggestedQuestions(source.botId);
+    } catch (error) {
+      console.warn("Failed to refresh suggested questions:", error);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     await db.knowledgeSource.update({
       where: { id: sourceId },
       data: { status: "FAILED", errorMessage: message },
-    });
+    }).catch((updateError) => console.error("Failed to store ingestion error", updateError));
     throw err;
   }
 }

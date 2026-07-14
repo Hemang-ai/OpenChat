@@ -30,7 +30,7 @@ function genId() {
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
-function addToRemoveQueue(toastId: string, dispatch: React.Dispatch<Action>) {
+function addToRemoveQueue(toastId: string) {
   if (toastTimeouts.has(toastId)) return;
   const timeout = setTimeout(() => {
     toastTimeouts.delete(toastId);
@@ -58,6 +58,12 @@ const listeners: Array<(state: State) => void> = [];
 let memoryState: State = { toasts: [] };
 
 function dispatch(action: Action) {
+  if (action.type === "DISMISS_TOAST") {
+    const ids = action.toastId
+      ? [action.toastId]
+      : memoryState.toasts.map(item => item.id);
+    ids.forEach(addToRemoveQueue);
+  }
   memoryState = reducer(memoryState, action);
   listeners.forEach((l) => l(memoryState));
 }

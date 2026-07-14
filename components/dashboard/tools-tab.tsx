@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Activity, Loader2, Globe, ShieldCheck, AlertTriangle, Wrench, Sparkles } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,7 +98,21 @@ export default function ToolsTab({ botId }: { botId: string }) {
   };
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    Promise.all([
+      fetch(`/api/admin/bots/${botId}/tools`).then(response => response.json()),
+      fetch(`/api/admin/bots/${botId}/tool-executions`).then(response => response.json()),
+    ]).then(([toolData, executionData]) => {
+      if (cancelled) return;
+      setTools(toolData.tools || []);
+      setExecutions(executionData.executions || []);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [botId]);
 
   const handleDelete = async (id: string) => {

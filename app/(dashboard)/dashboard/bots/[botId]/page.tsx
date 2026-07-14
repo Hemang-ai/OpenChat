@@ -28,7 +28,8 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
         select: {
           id: true, type: true, name: true, status: true,
           createdAt: true, errorMessage: true, url: true,
-          fileSize: true, mimeType: true,
+          fileSize: true, mimeType: true, updatedAt: true,
+          metadata: true,
         },
       },
     },
@@ -38,13 +39,13 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex items-start gap-4 mb-8">
+      <div className="flex items-start gap-3 sm:gap-4 mb-6 sm:mb-8">
         <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
           <Bot className="w-6 h-6 text-gray-600" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">{bot.name}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{bot.name}</h1>
             <Badge variant={bot.isActive ? "success" : "secondary"}>
               {bot.isActive ? "Active" : "Inactive"}
             </Badge>
@@ -57,7 +58,8 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
       </div>
 
       <Tabs defaultValue="knowledge">
-        <TabsList className="mb-6 flex-wrap h-auto gap-1">
+        <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <TabsList className="w-max min-w-full gap-1">
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="tools">⚡ Tools</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
@@ -67,9 +69,14 @@ export default async function BotPage({ params }: { params: Promise<{ botId: str
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="knowledge">
-          <KnowledgeTab bot={{ id: bot.id, name: bot.name }} sources={bot.knowledgeSources} />
+          <KnowledgeTab
+            key={bot.knowledgeSources.map(source => `${source.id}:${source.status}:${source.updatedAt.getTime()}`).join("|")}
+            bot={{ id: bot.id, name: bot.name }}
+            sources={bot.knowledgeSources}
+          />
         </TabsContent>
 
         <TabsContent value="tools">

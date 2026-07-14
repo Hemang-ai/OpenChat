@@ -319,13 +319,13 @@ The callback must match exactly, including scheme, hostname, port, path, and tra
 1. **Database**: Provision Neon from the Vercel Marketplace or use another PostgreSQL host with pgvector. The initial migration enables the `vector` extension.
 2. **Core secrets**: Set `JWT_SECRET`, `APP_URL`, and `NEXT_PUBLIC_APP_URL` in Vercel. A Neon Marketplace connection supplies `DATABASE_URL` automatically.
 3. **Google login**: Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then add the exact production callback in Google Cloud.
-4. **Public chat rate limiting**: Configure Upstash Redis with `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. Production fails closed when Redis is absent unless `RATE_LIMIT_FAIL_OPEN=true` is deliberately enabled.
+4. **Public chat rate limiting**: Upstash Redis is recommended for distributed enforcement. Without it, the app uses a bounded per-instance limiter so public chat remains available. Set `RATE_LIMIT_REQUIRE_DISTRIBUTED=true` if your deployment must fail closed when Redis is absent. `RATE_LIMIT_FAIL_OPEN=true` applies only when a configured Redis service becomes unavailable.
 5. **Deploy**: `npm run build` generates Prisma, applies committed migrations with `prisma migrate deploy`, and builds Next.js.
 6. Visit the production URL and test registration, bot creation, ingestion, preview chat, and the public embed separately.
 
 The reference deployment uses Vercel at [open-chat1.vercel.app](https://open-chat1.vercel.app) with a Vercel Marketplace Neon database.
 
-> **Storage note:** file uploads currently use local filesystem storage and ingestion starts from the request process. That works in local Docker and conventional long-running Node deployments, but Vercel filesystems are ephemeral. Before relying on file ingestion in production, connect durable object storage (Vercel Blob/S3) and a durable ingestion worker or queue. URL, manual-text, and YouTube sources do not require persisted upload files, but durable background execution is still recommended.
+> **Serverless ingestion:** uploaded files are parsed from the request buffer and are never written to Vercel's read-only application directory. The route waits for extraction, chunking, embeddings, vector storage, and source status updates before returning. This makes files, URLs, YouTube transcripts, and manual text reliable on Vercel for the current 10 MB limit. For larger files or high-volume ingestion, move the same pipeline behind object storage and a durable queue.
 
 ### Docker (self-host)
 ```bash
@@ -344,7 +344,8 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 - Public lead submissions are validated, rate-limited, and only accepted when lead capture is enabled for an active bot.
 - Per-workspace API keys are stored in the database; never sent to the client (masked in UI).
 - File uploads are MIME-type checked and size-capped (default 10 MB).
-- Public chat and lead endpoints support distributed Upstash rate limiting; local development uses an in-memory limiter.
+- Website ingestion validates every redirect target, blocks local/private network addresses, and caps pages at 5 MB to reduce SSRF and memory-abuse risk.
+- Public chat and lead endpoints support distributed Upstash rate limiting and use a bounded per-instance fallback when Redis is not configured.
 - Google client secrets and downloaded `client_secret_*.json` files must never be committed. Rotate any credential exposed in chat, screenshots, logs, or public history.
 - Tenant isolation: every admin query is scoped by `workspace.ownerId = session.userId`.
 
@@ -357,7 +358,7 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 - [ ] Slack / Teams bot integrations
 - [ ] Human-handoff notifications and CRM exports
 - [ ] Complete approval/resume UI for tools marked `REQUIRE_CONFIRM`
-- [ ] Durable object storage and queued ingestion for serverless deployments
+- [ ] Durable object storage and queued ingestion for large files and high-volume workloads
 - [ ] Multi-language chatbots
 - [ ] Advanced moderation + custom blocklists
 - [ ] White-label branding (custom domains, theme colors, fonts)

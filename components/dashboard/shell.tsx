@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { Bot, LayoutDashboard, LogOut, Menu, GitBranch, Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/utils/use-toast";
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -25,7 +24,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200
+      <aside aria-label="Dashboard navigation" className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-200
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:flex`}>
         <div className="p-4 border-b border-gray-100 flex items-center gap-2">
           <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
@@ -39,7 +38,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex min-h-11 items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 pathname === link.href
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -57,13 +56,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             href="https://github.com/Hemang-ai/OpenChat"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="flex min-h-11 items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
             <GitBranch className="w-4 h-4" /> GitHub
           </a>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="w-full flex min-h-11 items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
@@ -82,7 +81,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar (mobile) */}
         <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-gray-200">
-          <button onClick={() => setMobileOpen(true)}>
+          <button aria-label="Open navigation" className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-gray-100" onClick={() => setMobileOpen(true)}>
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
@@ -92,7 +91,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <div className="w-5" />
         </header>
 
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto px-4 py-5 sm:p-6">
           {children}
         </main>
       </div>

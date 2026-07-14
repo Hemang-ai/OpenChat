@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/lib/utils/use-toast";
+import { GoogleSignIn } from "@/components/auth/google-sign-in";
 
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -61,6 +62,7 @@ export default function RegisterPage() {
             <CardDescription>Start building your AI chatbot today</CardDescription>
           </CardHeader>
           <CardContent>
+            <GoogleSignIn />
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="name">Your name</Label>

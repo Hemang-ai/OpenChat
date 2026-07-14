@@ -167,7 +167,7 @@ npx prisma migrate deploy
 - **Database**: PostgreSQL 16 with pgvector extension (cosine similarity)
 - **ORM**: Prisma 5
 - **AI**: OpenAI / Anthropic / Google Gemini / Groq / Ollama via a unified provider abstraction
-- **Auth**: JWT in httpOnly cookies + bcrypt password hashing
+- **Auth**: Google OAuth or email/password, with JWT sessions in httpOnly cookies
 - **Validation**: Zod
 - **PDF parsing**: pdf-parse v2; DOCX: mammoth; HTML: cheerio; YouTube: youtube-transcript
 
@@ -252,6 +252,10 @@ DATABASE_URL="postgresql://postgres:password@localhost:5432/openbusinesschat?sch
 JWT_SECRET="your-32-char-random-secret"
 OPENAI_API_KEY="sk-..."          # used for embeddings even when chat uses another provider
 
+# Google sign-in (optional)
+GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-client-secret"
+
 # Optional — defaults used if unset
 OPENAI_MODEL="gpt-4o-mini"
 OPENAI_EMBEDDING_MODEL="text-embedding-3-small"
@@ -269,6 +273,17 @@ OLLAMA_BASE_URL="http://localhost:11434"
 
 Workspace-level settings (entered via the dashboard) **always override** these defaults.
 
+### Google OAuth
+
+Create a Web application OAuth client in Google Cloud and add these authorized redirect URIs:
+
+```text
+http://localhost:3000/api/auth/google/callback
+https://YOUR_DOMAIN/api/auth/google/callback
+```
+
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env` locally and in your deployment environment. Never commit the downloaded Google credential JSON file.
+
 ---
 
 ## Deployment
@@ -276,7 +291,7 @@ Workspace-level settings (entered via the dashboard) **always override** these d
 ### Vercel + cloud Postgres
 1. **Database**: Create a free Postgres on [Neon](https://neon.tech) or [Supabase](https://supabase.com). Enable the `vector` extension.
 2. **Vercel**: Import the GitHub repo. Set the env vars above (point `DATABASE_URL` at your cloud DB).
-3. After deploy, run `npx prisma migrate deploy` against the cloud DB once.
+3. The production build runs `prisma migrate deploy` before building Next.js.
 4. Done — visit your `*.vercel.app` URL.
 
 ### Docker (self-host)

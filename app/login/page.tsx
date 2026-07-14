@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/lib/utils/use-toast";
+import { GoogleSignIn } from "@/components/auth/google-sign-in";
 
 const schema = z.object({
   email: z.string().email("Invalid email address"),
@@ -22,6 +23,25 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
+
+  useEffect(() => {
+    const error = new URLSearchParams(window.location.search).get("error");
+    if (!error) return;
+
+    const messages: Record<string, string> = {
+      google_access_denied: "Google sign-in was cancelled.",
+      google_invalid_state: "The sign-in request expired. Please try again.",
+      google_unverified_email: "Google could not verify your email address.",
+      google_not_configured: "Google sign-in is not configured yet.",
+      google_auth_failed: "Google sign-in failed. Please try again.",
+    };
+    toast({
+      title: "Unable to sign in",
+      description: messages[error] || "Google sign-in failed. Please try again.",
+      variant: "destructive",
+    });
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
@@ -59,6 +79,7 @@ export default function LoginPage() {
             <CardDescription>Sign in to your account</CardDescription>
           </CardHeader>
           <CardContent>
+            <GoogleSignIn />
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="email">Email</Label>

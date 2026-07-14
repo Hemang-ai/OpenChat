@@ -17,6 +17,21 @@ export interface LLMProvider {
   chatAgent(messages: AgentMessage[], tools?: ToolDef[]): Promise<AgentTurn>;
 }
 
+async function providerRequestError(label: string, response: Response): Promise<Error> {
+  const raw = await response.text();
+  let detail = "";
+
+  try {
+    const data = JSON.parse(raw) as { error?: { message?: unknown } | string; message?: unknown };
+    const candidate = typeof data.error === "string" ? data.error : data.error?.message ?? data.message;
+    if (typeof candidate === "string") detail = candidate.trim().slice(0, 300);
+  } catch {
+    if (!/^\s*</.test(raw)) detail = raw.trim().slice(0, 300);
+  }
+
+  return new Error(`${label} request failed (HTTP ${response.status})${detail ? `: ${detail}` : "."}`);
+}
+
 export interface AIConfig {
   provider?: string | null;
   fallbackProvider?: string | null;
@@ -47,7 +62,7 @@ class OpenAIProvider implements LLMProvider {
       headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.model, messages }),
     });
-    if (!res.ok) throw new Error(`OpenAI error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("OpenAI", res);
     const data = await res.json();
     return data.choices[0].message.content;
   }
@@ -57,7 +72,7 @@ class OpenAIProvider implements LLMProvider {
       headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.embeddingModel, input: text }),
     });
-    if (!res.ok) throw new Error(`OpenAI embed error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("OpenAI embedding", res);
     const data = await res.json();
     return data.data[0].embedding;
   }
@@ -95,7 +110,7 @@ class OpenAIProvider implements LLMProvider {
       headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`OpenAI error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("OpenAI", res);
     const data = await res.json();
     const msg = data.choices[0]?.message || {};
     const text = msg.content || "";
@@ -120,7 +135,7 @@ class AnthropicProvider implements LLMProvider {
       headers: { "x-api-key": this.apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.model, max_tokens: 1024, system, messages: userMessages }),
     });
-    if (!res.ok) throw new Error(`Anthropic error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("Anthropic", res);
     const data = await res.json();
     return data.content[0].text;
   }
@@ -168,7 +183,7 @@ class AnthropicProvider implements LLMProvider {
       headers: { "x-api-key": this.apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Anthropic error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("Anthropic", res);
     const data = await res.json();
     const blocks: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }> =
       data.content || [];
@@ -188,7 +203,7 @@ class GroqProvider implements LLMProvider {
       headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.model, messages }),
     });
-    if (!res.ok) throw new Error(`Groq error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("Groq", res);
     const data = await res.json();
     return data.choices[0].message.content;
   }
@@ -217,7 +232,7 @@ class GeminiProvider implements LLMProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Gemini error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("Gemini", res);
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
@@ -235,7 +250,7 @@ class OllamaProvider implements LLMProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.model, messages, stream: false }),
     });
-    if (!res.ok) throw new Error(`Ollama error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("Ollama", res);
     const data = await res.json();
     return data.message.content;
   }
@@ -245,7 +260,7 @@ class OllamaProvider implements LLMProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.model, prompt: text }),
     });
-    if (!res.ok) throw new Error(`Ollama embed error: ${await res.text()}`);
+    if (!res.ok) throw await providerRequestError("Ollama embedding", res);
     const data = await res.json();
     return data.embedding;
   }

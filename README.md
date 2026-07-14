@@ -7,14 +7,14 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791)](https://github.com/pgvector/pgvector)
 
-> **⚡ v0.2.0 — Agentic actions are live.** Your bot can now DO things — look up orders, create tickets, query your APIs, send notifications. Tools work with OpenAI & Anthropic function-calling.
-> Self-hostable in minutes. Bring your own AI keys. MIT licensed.
+> **Current main:** Google OAuth, lead capture, and agentic HTTP actions are live. Tools use native function-calling with OpenAI and Anthropic.
+> Self-hostable, bring-your-own-key, and MIT licensed. Live deployment: [open-chat1.vercel.app](https://open-chat1.vercel.app).
 
 ---
 
 ## What is OpenBusinessChat?
 
-OpenBusinessChat lets any business create a custom AI chatbot trained **only on their own knowledge** — and embed it on any website with a single line of code. No hallucinations, no vendor lock-in, no usage limits.
+OpenBusinessChat lets a business create a custom AI chatbot grounded in its own knowledge and embed it on a website with a single line of code. Retrieval thresholds and refusal controls reduce unsupported answers without pretending that any LLM can guarantee zero hallucinations.
 
 - **Upload knowledge** — PDFs, Word docs, TXT, CSV, Markdown, website URLs, YouTube transcripts, manual text
 - **Take action with tools** — call your APIs, look up orders, create tickets, send emails — your bot decides when to use them
@@ -23,7 +23,7 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 - **Capture leads from chat** — optional visitor follow-up form plus a dashboard lead inbox
 - **Bring your own AI** — OpenAI, Anthropic, Google Gemini, Groq, or local Ollama (with primary + fallback chain)
 - **Multi-tenant** — each business workspace has its own bots, knowledge, and API keys
-- **Production-grade** — TypeScript end-to-end, Prisma + PostgreSQL, secure auth, abuse protection
+- **Production-oriented foundation** — TypeScript end-to-end, Prisma + PostgreSQL, tenant isolation, secure auth, and abuse-protection hooks
 
 ---
 
@@ -32,6 +32,7 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 | Feature | Status |
 |---|---|
 | Email/password auth (JWT + bcrypt, httpOnly cookies) | ✅ |
+| Google OAuth (verified email, CSRF state, account linking) | ✅ |
 | Multi-tenant data model (User → Workspace → Bot → KnowledgeSource → Document → DocumentChunk) | ✅ |
 | PostgreSQL + pgvector with prepared migrations | ✅ |
 | Admin dashboard (workspace selector, bot CRUD, settings) | ✅ |
@@ -57,7 +58,7 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 | Animated end-to-end flow demo on the landing page | ✅ |
 | **Agentic tools** — bot calls HTTP APIs via function-calling (OpenAI + Anthropic) | ✅ |
 | **Tool execution log** with input/output, latency, status per invocation | ✅ |
-| **Approval gating** — tools can require user confirmation before running | ✅ |
+| **Approval gating foundation** — records pending approvals; approval/resume UI is next | 🟡 |
 | MIT licensed, fully self-hostable | ✅ |
 
 ---
@@ -65,9 +66,9 @@ OpenBusinessChat lets any business create a custom AI chatbot trained **only on 
 ## Quick start
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 20.9+
 - Docker Desktop (for local Postgres with pgvector)
-- An OpenAI API key (for embeddings) — get one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys). $5 of credit goes a long way with `gpt-4o-mini` + `text-embedding-3-small`.
+- An OpenAI API key for cloud embeddings, or a local Ollama model that supports embeddings. Anthropic, Gemini, and Groq chat currently use OpenAI for embeddings.
 
 ### Setup
 ```bash
@@ -83,10 +84,11 @@ cp .env.example .env
 # Open .env and set:
 #   DATABASE_URL   (the docker-compose default already matches)
 #   JWT_SECRET     (any random 32+ char string)
-#   OPENAI_API_KEY (your sk-... key)
+#   APP_URL         (http://localhost:3000)
+#   OPENAI_API_KEY  (your sk-... key, unless using Ollama)
 
 # 4. Start Postgres + pgvector
-docker-compose up -d postgres
+docker compose up -d postgres
 
 # 5. Run migrations
 npx prisma generate
@@ -99,7 +101,7 @@ npm run dev
 Open **[http://localhost:3000](http://localhost:3000)**.
 
 ### First-time flow
-1. **Register** → an account + workspace are created
+1. **Register** with Google or email/password → an account + workspace are created
 2. **AI Settings** → paste your OpenAI API key, click Save
 3. **Dashboard → + New bot** → give it a name
 4. **Bot → Knowledge tab** → upload a PDF or paste manual text → wait for `COMPLETED`
@@ -185,12 +187,13 @@ npx prisma migrate deploy
 │  Next.js (App Router)                                       │
 │                                                             │
 │  /api/public/chat  ──► RAG ──► retrieve chunks (pgvector)   │
-│                          │  ──► LLM call (provider chain)   │
+│                          │  ──► LLM + optional tool loop    │
 │                          ▼                                  │
 │                    grounding check, source citations        │
 │                                                             │
 │  /api/public/leads ──► validated lead capture               │
 │                                                             │
+│  /api/auth/google  ──► Google OAuth + local JWT session     │
 │  /api/admin/*      ──► auth-guarded admin endpoints         │
 │  /dashboard/*      ──► admin UI, analytics, lead inbox       │
 └────────────────────────────────────────────────────────────┘
@@ -198,7 +201,8 @@ npx prisma migrate deploy
                   ┌─────────────────┴─────────────────┐
                   ▼                                   ▼
          PostgreSQL + pgvector                Workspace AI provider
-         (User, Workspace, Bot,               (OpenAI / Anthropic /
+         (User, OAuthAccount,                 (OpenAI / Anthropic /
+          Workspace, Bot, Tool,
           KnowledgeSource, Document,           Gemini / Groq / Ollama)
           DocumentChunk[vector],
           Conversation, Message,
@@ -211,7 +215,7 @@ npx prisma migrate deploy
 app/
   (marketing)/        Landing page + animated demo
   (dashboard)/        Admin UI (workspace, bots, AI settings)
-  api/auth/           Login, register, logout
+  api/auth/           Email/password + Google OAuth, logout
   api/admin/          Workspace + bot CRUD, knowledge upload, chat preview,
                       analytics, leads, logs, suggested-questions
   api/public/         Anonymous chat + lead capture endpoints (keyed by publicKey)
@@ -225,12 +229,14 @@ components/
   marketing/          Landing animations (FlowAnimation, DashboardMockup)
 
 lib/
+  agents/             Tool-calling loop, HTTP execution, execution records
   ai/                 Provider abstraction + curated model catalog
-  auth/               JWT + bcrypt helpers
+  auth/               JWT, bcrypt, and Google OAuth helpers
   db/                 Prisma client singleton
   ingestion/          Chunker + pipeline orchestrator
   loaders/            PDF, DOCX, website, YouTube, Google Drive (placeholder)
   rag/                Chat engine, retrieval, suggested-questions generator
+  security/           Upstash/in-memory rate limiting
   utils/              Zod helpers, classnames, toast
 
 prisma/
@@ -247,35 +253,54 @@ types/index.ts        Shared TypeScript types
 ## Environment variables
 
 ```env
-# Required
+# Core application
 DATABASE_URL="postgresql://postgres:password@localhost:5432/openbusinesschat?schema=public"
 JWT_SECRET="your-32-char-random-secret"
-OPENAI_API_KEY="sk-..."          # used for embeddings even when chat uses another provider
+APP_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
 # Google sign-in (optional)
 GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="your-client-secret"
 
-# Optional — defaults used if unset
+# AI defaults (workspace settings override these)
+LLM_PROVIDER="openai"            # openai | anthropic | gemini | groq | ollama
+LLM_FALLBACK_PROVIDER=""
+OPENAI_API_KEY="sk-..."          # embeddings for OpenAI/Anthropic/Gemini/Groq
 OPENAI_MODEL="gpt-4o-mini"
 OPENAI_EMBEDDING_MODEL="text-embedding-3-small"
-LLM_PROVIDER="openai"            # openai | anthropic | gemini | groq | ollama
-APP_URL="http://localhost:3000"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-MAX_FILE_SIZE_MB="10"
-
-# Provider keys (also editable per-workspace via the AI Settings UI)
 ANTHROPIC_API_KEY=""
+ANTHROPIC_MODEL=""
 GEMINI_API_KEY=""
+GEMINI_MODEL=""
 GROQ_API_KEY=""
+GROQ_MODEL=""
 OLLAMA_BASE_URL="http://localhost:11434"
+OLLAMA_MODEL=""
+
+# Uploads and public API protection
+MAX_FILE_SIZE_MB="10"
+UPSTASH_REDIS_REST_URL=""
+UPSTASH_REDIS_REST_TOKEN=""
+PUBLIC_CHAT_RATE_LIMIT_REQUESTS="30"
+PUBLIC_CHAT_RATE_LIMIT_WINDOW_SECONDS="60"
+RATE_LIMIT_FAIL_OPEN="false"
 ```
 
 Workspace-level settings (entered via the dashboard) **always override** these defaults.
 
 ### Google OAuth
 
-Create a Web application OAuth client in Google Cloud and add these authorized redirect URIs:
+Create a **Web application** OAuth client in Google Cloud.
+
+Authorized JavaScript origins:
+
+```text
+http://localhost:3000
+https://YOUR_DOMAIN
+```
+
+Authorized redirect URIs:
 
 ```text
 http://localhost:3000/api/auth/google/callback
@@ -284,19 +309,27 @@ https://YOUR_DOMAIN/api/auth/google/callback
 
 Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env` locally and in your deployment environment. Never commit the downloaded Google credential JSON file.
 
+The callback must match exactly, including scheme, hostname, port, path, and trailing slash. Adding only a JavaScript origin causes Google error `400: redirect_uri_mismatch`. After saving changes in Google Cloud, allow a few minutes for propagation.
+
 ---
 
 ## Deployment
 
 ### Vercel + cloud Postgres
-1. **Database**: Create a free Postgres on [Neon](https://neon.tech) or [Supabase](https://supabase.com). Enable the `vector` extension.
-2. **Vercel**: Import the GitHub repo. Set the env vars above (point `DATABASE_URL` at your cloud DB).
-3. The production build runs `prisma migrate deploy` before building Next.js.
-4. Done — visit your `*.vercel.app` URL.
+1. **Database**: Provision Neon from the Vercel Marketplace or use another PostgreSQL host with pgvector. The initial migration enables the `vector` extension.
+2. **Core secrets**: Set `JWT_SECRET`, `APP_URL`, and `NEXT_PUBLIC_APP_URL` in Vercel. A Neon Marketplace connection supplies `DATABASE_URL` automatically.
+3. **Google login**: Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then add the exact production callback in Google Cloud.
+4. **Public chat rate limiting**: Configure Upstash Redis with `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. Production fails closed when Redis is absent unless `RATE_LIMIT_FAIL_OPEN=true` is deliberately enabled.
+5. **Deploy**: `npm run build` generates Prisma, applies committed migrations with `prisma migrate deploy`, and builds Next.js.
+6. Visit the production URL and test registration, bot creation, ingestion, preview chat, and the public embed separately.
+
+The reference deployment uses Vercel at [open-chat1.vercel.app](https://open-chat1.vercel.app) with a Vercel Marketplace Neon database.
+
+> **Storage note:** file uploads currently use local filesystem storage and ingestion starts from the request process. That works in local Docker and conventional long-running Node deployments, but Vercel filesystems are ephemeral. Before relying on file ingestion in production, connect durable object storage (Vercel Blob/S3) and a durable ingestion worker or queue. URL, manual-text, and YouTube sources do not require persisted upload files, but durable background execution is still recommended.
 
 ### Docker (self-host)
 ```bash
-docker-compose up -d           # brings up Postgres
+docker compose up -d           # brings up Postgres
 npm run build && npm start     # serves on :3000
 ```
 A production `Dockerfile` is included for one-shot containerization if you prefer that.
@@ -306,11 +339,13 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 ## Security notes
 
 - All admin routes are guarded by a Next.js `proxy.ts` (formerly middleware) that checks the JWT cookie.
+- Google OAuth uses a short-lived state cookie, verifies Google ID tokens and verified email addresses, and links provider identities through `OAuthAccount` rather than storing OAuth users with fake passwords.
 - Public chat endpoints (`/api/public/*` and `/embed/*`) only accept a bot's `publicKey` — internal IDs are never exposed.
 - Public lead submissions are validated, rate-limited, and only accepted when lead capture is enabled for an active bot.
 - Per-workspace API keys are stored in the database; never sent to the client (masked in UI).
 - File uploads are MIME-type checked and size-capped (default 10 MB).
-- Basic rate-limiting structure is in place for public chat requests.
+- Public chat and lead endpoints support distributed Upstash rate limiting; local development uses an in-memory limiter.
+- Google client secrets and downloaded `client_secret_*.json` files must never be committed. Rotate any credential exposed in chat, screenshots, logs, or public history.
 - Tenant isolation: every admin query is scoped by `workspace.ownerId = session.userId`.
 
 ---
@@ -321,6 +356,8 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 - [ ] Google Drive integration (scaffold already in `lib/loaders/googledrive.ts`)
 - [ ] Slack / Teams bot integrations
 - [ ] Human-handoff notifications and CRM exports
+- [ ] Complete approval/resume UI for tools marked `REQUIRE_CONFIRM`
+- [ ] Durable object storage and queued ingestion for serverless deployments
 - [ ] Multi-language chatbots
 - [ ] Advanced moderation + custom blocklists
 - [ ] White-label branding (custom domains, theme colors, fonts)

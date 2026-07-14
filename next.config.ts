@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "mammoth", "@prisma/client"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "mammoth", "@prisma/client"],
+  outputFileTracingIncludes: {
+    "/api/admin/bots/*/knowledge": [
+      "./node_modules/@napi-rs/canvas/**/*",
+      "./node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
+    ],
+  },
   turbopack: {
     root: projectRoot,
   },

@@ -1,7 +1,6 @@
 import { db } from "@/lib/db/client";
 import { getLLMProvider, getAIConfigForBot } from "@/lib/ai/provider";
 import { chunkText } from "./chunker";
-import { extractPdfText, extractPdfTextFromBuffer } from "@/lib/loaders/pdf";
 import { extractDocxText, extractDocxTextFromBuffer } from "@/lib/loaders/docx";
 import { extractWebsiteText } from "@/lib/loaders/website";
 import { extractYouTubeTranscript } from "@/lib/loaders/youtube";
@@ -42,6 +41,7 @@ export async function ingestKnowledgeSource(
         const buffer = input.fileBuffer;
         if (!buffer && !source.filePath) throw new Error("The uploaded file is no longer available. Please upload it again.");
         if (ext === ".pdf") {
+          const { extractPdfText, extractPdfTextFromBuffer } = await import("@/lib/loaders/pdf");
           text = buffer ? await extractPdfTextFromBuffer(buffer) : await extractPdfText(source.filePath!);
         } else if (ext === ".docx") {
           text = buffer ? await extractDocxTextFromBuffer(buffer) : await extractDocxText(source.filePath!);

@@ -38,20 +38,32 @@ export async function agenticChat(
   const bot = await db.bot.findUnique({ where: { id: botId } });
   if (!bot) throw new Error("Bot not found");
 
-  const aiConfig = await getAIConfigForBot(botId);
-
-  // 1. RAG retrieval (unchanged)
-  const chunks = await retrieveRelevantChunks(botId, userMessage, 6, aiConfig);
-  const SIMILARITY = bot.strictness === "strict" ? 0.30 : bot.strictness === "balanced" ? 0.18 : 0.15;
-  const relevant = chunks.filter((c) => c.similarity >= SIMILARITY);
-
-  // 2. Load active tools for this bot
-  const tools = await db.tool.findMany({ where: { botId, isActive: true } });
+  const [tools, completedSourceCount] = await Promise.all([
+    db.tool.findMany({ where: { botId, isActive: true } }),
+    db.knowledgeSource.count({ where: { botId, status: "COMPLETED" } }),
+  ]);
   const toolDefs = tools.map(toolToFunctionDef);
 
   // Grounding is enforced in code, not delegated only to prompt compliance.
   // Without matching knowledge or an action capable of retrieving live data,
   // the model must never get an opportunity to answer from outside knowledge.
+  if (completedSourceCount === 0 && tools.length === 0) {
+    return {
+      answer: REFUSAL,
+      isGrounded: false,
+      isRefused: true,
+      sources: [],
+      toolCalls: [],
+    };
+  }
+
+  const aiConfig = await getAIConfigForBot(botId);
+
+  // 1. RAG retrieval
+  const chunks = await retrieveRelevantChunks(botId, userMessage, 6, aiConfig);
+  const SIMILARITY = bot.strictness === "strict" ? 0.30 : bot.strictness === "balanced" ? 0.18 : 0.15;
+  const relevant = chunks.filter((c) => c.similarity >= SIMILARITY);
+
   if (relevant.length === 0 && tools.length === 0) {
     return {
       answer: REFUSAL,
@@ -62,7 +74,7 @@ export async function agenticChat(
     };
   }
 
-  // 3. Build the system prompt — RAG context + tool guidance
+  // 2. Build the system prompt — RAG context + tool guidance
   const context = relevant.length
     ? relevant.map((c, i) => `[Source ${i + 1}]: ${c.content}`).join("\n\n")
     : "(No matching knowledge found for this question.)";

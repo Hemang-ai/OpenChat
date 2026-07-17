@@ -24,6 +24,17 @@ export function isAllowedFile(filename: string, mimeType: string): boolean {
   return MIME_TYPES_BY_EXTENSION[ext]?.includes(mimeType) ?? false;
 }
 
+export function hasValidFileSignature(filename: string, buffer: Buffer): boolean {
+  const ext = filename.substring(filename.lastIndexOf(".")).toLowerCase();
+  if (ext === ".pdf") return buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+  if (ext === ".docx") return buffer[0] === 0x50 && buffer[1] === 0x4b;
+  if ([".txt", ".md", ".csv"].includes(ext)) {
+    const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
+    return !sample.includes(0) && !sample.toString("utf8").includes("\uFFFD");
+  }
+  return false;
+}
+
 export function getMaxFileSizeBytes(): number {
   const mb = parseInt(process.env.MAX_FILE_SIZE_MB || "10", 10);
   return mb * 1024 * 1024;

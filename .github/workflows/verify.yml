@@ -1,0 +1,41 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/openbusinesschat
+      NEXTAUTH_SECRET: ci-only-session-secret-with-at-least-32-characters
+      WORKSPACE_SECRETS_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npx prisma generate
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Block high and critical dependency findings
+        run: npm audit --audit-level=high
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format cyclonedx > openbusinesschat.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: software-bill-of-materials
+          path: openbusinesschat.cdx.json
+

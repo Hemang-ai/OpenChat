@@ -22,6 +22,10 @@ interface ToolRow {
   isActive: boolean;
   createdAt: string;
   _count: { executions: number };
+  inputSchema: Record<string, unknown>;
+  riskTier: "READ_ONLY" | "WRITE" | "EXTERNAL_COMMUNICATION" | "FINANCIAL" | "IDENTITY" | "DESTRUCTIVE";
+  testStatus: "UNTESTED" | "PASSED" | "FAILED";
+  testedAt: string | null;
 }
 
 interface ToolExecutionRow {
@@ -30,7 +34,7 @@ interface ToolExecutionRow {
   input: unknown;
   output: unknown;
   errorMessage: string | null;
-  status: "SUCCESS" | "ERROR" | "PENDING_APPROVAL" | "REJECTED";
+  status: "SUCCESS" | "ERROR" | "PENDING_APPROVAL" | "PROCESSING" | "REJECTED";
   latencyMs: number | null;
   createdAt: string;
 }
@@ -80,6 +84,9 @@ export default function ToolsTab({ botId }: { botId: string }) {
   const [executions, setExecutions] = useState<ToolExecutionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [testTool, setTestTool] = useState<ToolRow | null>(null);
+  const [testInput, setTestInput] = useState("{}");
+  const [testing, setTesting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -134,6 +141,35 @@ export default function ToolsTab({ botId }: { botId: string }) {
       body: JSON.stringify({ isActive: !tool.isActive }),
     });
     if (res.ok) load();
+  };
+
+  const resolveApproval = async (executionId: string, action: "approve" | "reject") => {
+    const res = await fetch(`/api/admin/bots/${botId}/tool-executions/${executionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast({ title: "Action could not be completed", description: data.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: action === "approve" ? "Tool action approved" : "Tool action rejected" });
+    load();
+  };
+
+  const runTest = async () => {
+    if (!testTool) return;
+    let input: unknown;
+    try { input = JSON.parse(testInput); } catch { return toast({ title: "Test input must be valid JSON", variant: "destructive" }); }
+    setTesting(true);
+    const res = await fetch(`/api/admin/bots/${botId}/tools/${testTool.id}/test`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input }) });
+    const data = await res.json().catch(() => ({}));
+    setTesting(false);
+    if (!res.ok) return toast({ title: "Tool test failed", description: data.error, variant: "destructive" });
+    toast({ title: data.result.status === "success" ? "Tool test passed" : "Tool test completed with an error", description: data.result.errorMessage || `${data.result.latencyMs}ms` });
+    setTestTool(null);
+    load();
   };
 
   return (
@@ -202,6 +238,10 @@ export default function ToolsTab({ botId }: { botId: string }) {
                     <Badge variant="secondary" className="text-[10px]">
                       {t._count.executions} runs
                     </Badge>
+                    <Badge variant={t.testStatus === "PASSED" ? "success" : t.testStatus === "FAILED" ? "destructive" : "secondary"} className="text-[10px]">
+                      {t.testStatus === "PASSED" ? "Tested" : t.testStatus === "FAILED" ? "Test failed" : "Untested"}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">{t.riskTier.replaceAll("_", " ")}</Badge>
                   </div>
                   <div className="text-sm text-gray-600 mt-1">{t.description}</div>
                   {t.endpoint && (
@@ -211,6 +251,7 @@ export default function ToolsTab({ botId }: { botId: string }) {
                   )}
                 </div>
                 <div className="flex items-center gap-1">
+                  <Button size="sm" variant="outline" onClick={() => { setTestTool(t); setTestInput("{}"); }}>Test</Button>
                   <Button size="sm" variant="ghost" onClick={() => handleToggle(t)}>
                     {t.isActive ? "Disable" : "Enable"}
                   </Button>
@@ -252,6 +293,13 @@ export default function ToolsTab({ botId }: { botId: string }) {
                       {new Date(ex.createdAt).toLocaleString()}
                     </span>
                   </div>
+                  {ex.status === "PENDING_APPROVAL" && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                      <span className="flex-1">Review the input before this external action runs.</span>
+                      <Button size="sm" variant="outline" onClick={() => resolveApproval(ex.id, "reject")}>Reject</Button>
+                      <Button size="sm" onClick={() => resolveApproval(ex.id, "approve")}>Approve and run</Button>
+                    </div>
+                  )}
                   <details className="text-xs">
                     <summary className="cursor-pointer text-gray-500 hover:text-gray-700">View input / output</summary>
                     <div className="grid md:grid-cols-2 gap-2 mt-2">
@@ -265,6 +313,13 @@ export default function ToolsTab({ botId }: { botId: string }) {
           </div>
         )}
       </div>
+
+      <Dialog open={Boolean(testTool)} onOpenChange={(open) => !open && setTestTool(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Test {testTool?.name}</DialogTitle><DialogDescription>Run a redacted test through the production validation, network, timeout, and response mapping path. Test executions are labeled and do not enter a visitor conversation.</DialogDescription></DialogHeader>
+          <div className="space-y-3"><Label htmlFor="tool-test-input">JSON input</Label><Textarea id="tool-test-input" value={testInput} onChange={(event) => setTestInput(event.target.value)} className="min-h-40 font-mono text-xs" /><pre className="max-h-32 overflow-auto rounded bg-gray-50 p-2 text-[10px]">Schema: {JSON.stringify(testTool?.inputSchema || {}, null, 2)}</pre><Button onClick={runTest} disabled={testing}>{testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Run safe test</Button></div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -287,6 +342,7 @@ function CreateToolDialog({
   const [schemaText, setSchemaText] = useState('{\n  "type": "object",\n  "properties": {},\n  "required": []\n}');
   const [headersText, setHeadersText] = useState("");
   const [approvalMode, setApprovalMode] = useState<"AUTO" | "REQUIRE_CONFIRM">("AUTO");
+  const [riskTier, setRiskTier] = useState<ToolRow["riskTier"]>("READ_ONLY");
   const [saving, setSaving] = useState(false);
 
   const applyTemplate = (idx: number) => {
@@ -328,6 +384,7 @@ function CreateToolDialog({
           inputSchema,
           headers,
           approvalMode,
+          riskTier,
         }),
       });
       const data = await res.json();
@@ -441,6 +498,13 @@ function CreateToolDialog({
             />
           </div>
           <div>
+            <Label>Action risk</Label>
+            <select value={riskTier} onChange={(event) => { const next = event.target.value as ToolRow["riskTier"]; setRiskTier(next); if (next !== "READ_ONLY") setApprovalMode("REQUIRE_CONFIRM"); }} className="mt-1 flex min-h-11 w-full rounded-md border bg-white px-3 text-sm">
+              <option value="READ_ONLY">Read only</option><option value="WRITE">Writes business data</option><option value="EXTERNAL_COMMUNICATION">External communication</option><option value="FINANCIAL">Financial action</option><option value="IDENTITY">Identity or access</option><option value="DESTRUCTIVE">Destructive action</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">Anything beyond read-only requires visitor confirmation by default.</p>
+          </div>
+          <div>
             <Label>Approval mode</Label>
             <div className="flex gap-2 mt-1">
               {[
@@ -457,6 +521,7 @@ function CreateToolDialog({
                     type="radio"
                     className="mr-1.5"
                     checked={approvalMode === o.v}
+                    disabled={riskTier !== "READ_ONLY" && o.v === "AUTO"}
                     onChange={() => setApprovalMode(o.v as "AUTO" | "REQUIRE_CONFIRM")}
                   />
                   <span className="font-medium">{o.label}</span>

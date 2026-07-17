@@ -1,0 +1,53 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Download, KeyRound, Loader2, Plus, ShieldCheck, UsersRound } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/lib/utils/use-toast";
+
+type Data = {
+  workspace: { id: string; name: string; policy: Record<string, unknown> | null; retentionPolicy: Record<string, unknown> | null; dataRegion: string; customerKeyReference: string | null };
+  role: string;
+  members: Array<{ id: string; role: string; user: { name: string | null; email: string } }>;
+  invitations: Array<{ id: string; email: string; role: string; expiresAt: string }>;
+  serviceAccounts: Array<{ id: string; name: string; scopes: string[]; revokedAt: string | null; keys: Array<{ id: string; prefix: string; revokedAt: string | null; lastUsedAt: string | null }> }>;
+  domains: Array<{ id: string; domain: string; status: string }>;
+  sso: Array<{ id: string; type: string; issuer: string; enforced: boolean; isActive: boolean }>;
+  privacyRequests: Array<{ id: string; type: string; subjectEmail: string | null; status: string; requestedAt: string }>;
+  recentAudit: Array<{ id: string; type: string; createdAt: string }>;
+};
+
+export default function GovernancePanel({ workspaces }: { workspaces: Array<{ id: string; name: string }> }) {
+  const [workspaceId, setWorkspaceId] = useState(workspaces[0]?.id || "");
+  const [data, setData] = useState<Data | null>(null);
+  const [email, setEmail] = useState("");
+  const [serviceName, setServiceName] = useState("");
+  const [domain, setDomain] = useState("");
+  const [ssoIssuer, setSsoIssuer] = useState("");
+  const [ssoClientId, setSsoClientId] = useState("");
+  const [privacyEmail, setPrivacyEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => { if (!workspaceId) return; const response = await fetch(`/api/admin/workspaces/${workspaceId}/governance`); const next = await response.json(); if (!response.ok) throw new Error(next.error); setData(next); };
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    fetch(`/api/admin/workspaces/${workspaceId}/governance`).then(async (response) => { const next = await response.json(); if (!response.ok) throw new Error(next.error); return next as Data; }).then((next) => { if (!cancelled) setData(next); }).catch((error) => toast({ title: "Governance unavailable", description: error.message, variant: "destructive" }));
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+  const action = async (body: Record<string, unknown>) => { setSaving(true); const response = await fetch(`/api/admin/workspaces/${workspaceId}/governance`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await response.json(); setSaving(false); if (!response.ok) return toast({ title: "Action failed", description: result.error, variant: "destructive" }); const oneTime = result.apiKey || result.inviteToken || result.dnsRecord?.value; toast({ title: "Saved", description: oneTime ? `One-time value: ${oneTime}` : undefined }); await load(); };
+  if (!workspaceId) return <Card className="mt-6"><CardContent className="p-6 text-sm text-gray-500">Create a workspace first.</CardContent></Card>;
+  if (!data) return <div className="mt-6 flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading governance</div>;
+
+  return <div className="mt-6 space-y-6">
+    {workspaces.length > 1 && <select value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} className="h-10 rounded-md border bg-white px-3 text-sm">{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>}
+    <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><UsersRound className="h-4 w-4" /> Members and invitations</CardTitle></CardHeader><CardContent className="space-y-3"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teammate@company.com" type="email" /><Button disabled={!email || saving} onClick={() => action({ action: "invite", email, role: "BUILDER" })}><Plus className="mr-1 h-4 w-4" /> Invite builder</Button></div>{data.members.map((member) => <div key={member.id} className="flex items-center justify-between rounded-md border p-3 text-sm"><span>{member.user.name || member.user.email}<span className="ml-2 text-gray-400">{member.user.email}</span></span><Badge variant="secondary">{member.role}</Badge></div>)}{data.invitations.map((invite) => <div key={invite.id} className="flex items-center justify-between rounded-md border border-dashed p-3 text-sm"><span>{invite.email}<span className="ml-2 text-gray-400">expires {new Date(invite.expiresAt).toLocaleDateString()}</span></span><Badge variant="warning">INVITED {invite.role}</Badge></div>)}</CardContent></Card>
+    <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><KeyRound className="h-4 w-4" /> Service identities</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-gray-500">Keys are scoped, hashed, shown once, expirable, rate-limited, and revocable.</p><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><Input value={serviceName} onChange={(event) => setServiceName(event.target.value)} placeholder="Production reporting" /><Button disabled={!serviceName || saving} onClick={() => action({ action: "service-account", name: serviceName, scopes: ["bots:read", "conversations:read"], expiresInDays: 90 })}>Create 90-day key</Button></div>{data.serviceAccounts.map((account) => <div key={account.id} className="rounded-md border p-3 text-sm"><div className="flex justify-between"><strong>{account.name}</strong><Badge variant="secondary">{account.scopes.join(", ")}</Badge></div>{account.keys.map((key) => <div key={key.id} className="mt-2 flex items-center justify-between text-xs text-gray-500"><code>{key.prefix}…</code><Button size="sm" variant="ghost" disabled={Boolean(key.revokedAt)} onClick={() => action({ action: "revoke-key", keyId: key.id })}>{key.revokedAt ? "Revoked" : "Revoke"}</Button></div>)}</div>)}</CardContent></Card>
+    <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4" /> Organization policy</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="region">Data region</Label><Input id="region" defaultValue={data.workspace.dataRegion} onBlur={(event) => action({ action: "policy", allowedProviders: ["openai", "anthropic", "groq", "gemini", "ollama"], allowedModels: [], requirePublishApproval: false, externalToolsAllowed: true, retentionDays: 365, dataRegion: event.target.value, customerKeyReference: data.workspace.customerKeyReference })} /></div><div><Label htmlFor="cmk">Customer-managed key reference</Label><Input id="cmk" defaultValue={data.workspace.customerKeyReference || ""} placeholder="KMS/Key Vault URI" /></div><div className="sm:col-span-2"><p className="text-sm text-gray-500">Retention, provider/model allowlists, publish approval, external tools, residency, and customer key references are enforced from this policy record.</p></div></CardContent></Card>
+    <Card><CardHeader><CardTitle className="text-base">Domain claim and enterprise identity</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><Input value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="company.com" /><Button disabled={!domain || saving} onClick={() => action({ action: "domain", domain })}>Create DNS challenge</Button></div>{data.domains.map((item) => <div key={item.id} className="flex items-center justify-between rounded-md border p-3 text-sm"><span>{item.domain}</span><div className="flex items-center gap-2"><Badge variant={item.status === "VERIFIED" ? "success" : "secondary"}>{item.status}</Badge>{item.status !== "VERIFIED" && <Button size="sm" variant="outline" onClick={() => action({ action: "verify-domain", domainId: item.id })}>Verify</Button>}</div></div>)}<div className="grid gap-2 border-t pt-4 sm:grid-cols-[1.5fr_1fr_auto]"><Input value={ssoIssuer} onChange={(event) => setSsoIssuer(event.target.value)} placeholder="https://idp.example.com" /><Input value={ssoClientId} onChange={(event) => setSsoClientId(event.target.value)} placeholder="OIDC client ID" /><Button disabled={!ssoIssuer || !ssoClientId || saving} onClick={() => action({ action: "sso", type: "OIDC", issuer: ssoIssuer, clientId: ssoClientId, enforced: false })}>Add OIDC</Button></div>{data.sso.map((config) => <div key={config.id} className="flex justify-between rounded-md border p-3 text-sm"><span>{config.type} · {config.issuer}</span><Badge variant={config.isActive ? "success" : "secondary"}>{config.isActive ? config.enforced ? "Enforced" : "Active" : "Test required"}</Badge></div>)}<p className="text-xs text-gray-500">OIDC/SAML secrets are encrypted. SCIM uses a service identity with the `scim:users` scope. Activate enforcement only after verified-domain interoperability testing.</p></CardContent></Card>
+    <Card><CardHeader><CardTitle className="flex items-center justify-between text-base"><span>Privacy and audit evidence</span><a href={`/api/admin/workspaces/${workspaceId}/governance?export=audit`}><Button size="sm" variant="outline"><Download className="mr-1 h-4 w-4" /> Export redacted audit</Button></a></CardTitle></CardHeader><CardContent className="space-y-3"><div className="grid gap-2 sm:grid-cols-[1fr_auto]"><Input type="email" value={privacyEmail} onChange={(event) => setPrivacyEmail(event.target.value)} placeholder="data-subject@example.com" /><Button disabled={!privacyEmail || saving} onClick={() => action({ action: "privacy-request", type: "DELETE", subjectEmail: privacyEmail })}>Request verified deletion</Button></div>{data.privacyRequests.map((request) => <div key={request.id} className="flex justify-between rounded-md border p-3 text-sm"><span>{request.type}: {request.subjectEmail || "Redacted after completion"}</span><Badge variant="secondary">{request.status}</Badge></div>)}{data.recentAudit.slice(0, 10).map((event) => <div key={event.id} className="flex justify-between text-xs text-gray-500"><span>{event.type}</span><time>{new Date(event.createdAt).toLocaleString()}</time></div>)}</CardContent></Card>
+  </div>;
+}

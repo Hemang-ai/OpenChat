@@ -1,11 +1,12 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, BookOpen, CheckCircle, XCircle, Wrench } from "lucide-react";
+import { Send, Bot, User, BookOpen, CheckCircle, XCircle, Wrench, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import SuggestedBubbles from "@/components/chat/suggested-bubbles";
+import { MarkdownMessage } from "@/components/chat/markdown-message";
 
 interface ToolCallBadge {
   name: string;
@@ -21,8 +22,24 @@ interface Message {
   content: string;
   isGrounded?: boolean;
   isRefused?: boolean;
-  sources?: Array<{ id: string; content: string; documentTitle?: string | null }>;
+  sources?: Array<{ id: string; content: string; documentTitle?: string | null; sourceName: string; sourceUrl?: string | null; sourceUpdatedAt: string; similarity: number }>;
   toolCalls?: ToolCallBadge[];
+  evidenceScore?: number | null;
+  latencyMs?: number;
+}
+
+interface QuestionVerification {
+  text: string;
+  language: string;
+  verifiedAt: string;
+  sourceCount: number;
+  topSimilarity: number;
+}
+
+interface RejectedQuestion {
+  text: string;
+  language: string;
+  reason: string;
 }
 
 interface Props {
@@ -38,6 +55,8 @@ export default function ChatPreviewTab({ bot }: Props) {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [verification, setVerification] = useState<QuestionVerification[]>([]);
+  const [lastRejected, setLastRejected] = useState<RejectedQuestion[]>([]);
   const [refreshingSuggestions, setRefreshingSuggestions] = useState(false);
   const [hideSuggestions, setHideSuggestions] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -52,6 +71,8 @@ export default function ChatPreviewTab({ bot }: Props) {
         const r = await fetch(`/api/admin/bots/${bot.id}/suggested-questions`);
         const d = await r.json();
         if (Array.isArray(d.questions)) setSuggestions(d.questions);
+        if (Array.isArray(d.verification)) setVerification(d.verification);
+        if (Array.isArray(d.lastRejected)) setLastRejected(d.lastRejected);
       } catch (e) {
         console.warn("Failed to load suggestions:", e);
       }
@@ -64,6 +85,8 @@ export default function ChatPreviewTab({ bot }: Props) {
       const r = await fetch(`/api/admin/bots/${bot.id}/suggested-questions`, { method: "POST" });
       const d = await r.json();
       if (Array.isArray(d.questions)) setSuggestions(d.questions);
+      if (Array.isArray(d.verification)) setVerification(d.verification);
+      if (Array.isArray(d.lastRejected)) setLastRejected(d.lastRejected);
     } catch (e) {
       console.warn("Failed to refresh suggestions:", e);
     } finally {
@@ -98,6 +121,8 @@ export default function ChatPreviewTab({ bot }: Props) {
           isRefused: data.isRefused,
           sources: data.sources,
           toolCalls: Array.isArray(data.toolCalls) ? data.toolCalls : undefined,
+          evidenceScore: data.evidenceScore,
+          latencyMs: data.latencyMs,
         },
       ]);
     } catch (err) {
@@ -127,7 +152,7 @@ export default function ChatPreviewTab({ bot }: Props) {
   return (
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-blue-700">
-        <strong>Admin preview</strong> — Shows retrieved sources and grounding status. The public widget doesn&apos;t show these details.
+        <strong>Admin preview</strong> — Shows full retrieval evidence and grounding status. Visitors only see sources marked public.
       </div>
 
       <div className="flex flex-col h-[600px] border rounded-xl overflow-hidden bg-white">
@@ -151,13 +176,15 @@ export default function ChatPreviewTab({ bot }: Props) {
                   ? <User className="w-4 h-4 text-white" />
                   : <Bot className="w-4 h-4 text-gray-600" />}
               </div>
-              <div className={`max-w-[80%] ${msg.role === "user" ? "items-end" : ""}`}>
-                <div className={`rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+              <div className={`min-w-0 max-w-[85%] ${msg.role === "user" ? "items-end" : ""}`}>
+                <div className={`overflow-hidden rounded-2xl px-4 py-2.5 text-sm ${
                   msg.role === "user"
                     ? "bg-gray-900 text-white rounded-tr-sm"
                     : "bg-gray-100 text-gray-900 rounded-tl-sm"
                 }`}>
-                  {msg.content}
+                  {msg.role === "assistant"
+                    ? <MarkdownMessage content={msg.content} />
+                    : <p className="whitespace-pre-wrap break-words leading-6">{msg.content}</p>}
                 </div>
                 {msg.role === "assistant" && (msg.isGrounded !== undefined || msg.isRefused !== undefined) && (
                   <div className="flex items-center gap-2 mt-1.5">
@@ -185,6 +212,7 @@ export default function ChatPreviewTab({ bot }: Props) {
                         {msg.toolCalls.length} action{msg.toolCalls.length > 1 ? "s" : ""} taken
                       </span>
                     )}
+                    {typeof msg.evidenceScore === "number" && <span className="text-xs text-gray-500">Evidence {Math.round(msg.evidenceScore * 100)}% · {msg.latencyMs || 0}ms</span>}
                   </div>
                 )}
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
@@ -221,9 +249,10 @@ export default function ChatPreviewTab({ bot }: Props) {
                       <Card key={src.id} className="border-gray-200">
                         <CardContent className="p-2.5">
                           <p className="text-xs font-medium text-gray-500 mb-1">
-                            Source {i + 1}{src.documentTitle ? ` — ${src.documentTitle}` : ""}
+                            Source {i + 1} — {src.sourceName || src.documentTitle || "Business knowledge"} · {Math.round(src.similarity * 100)}%
                           </p>
                           <p className="text-xs text-gray-700 line-clamp-3">{src.content}</p>
+                          <p className="mt-1 text-[10px] text-gray-400">Updated {new Date(src.sourceUpdatedAt).toLocaleDateString()}{src.sourceUrl ? ` · ${src.sourceUrl}` : ""}</p>
                         </CardContent>
                       </Card>
                     ))}
@@ -290,6 +319,61 @@ export default function ChatPreviewTab({ bot }: Props) {
           </form>
         </div>
       </div>
+
+      {/* Suggested-question verification — admin-only; the public widget
+          never shows confidence badges to visitors. */}
+      {(verification.length > 0 || lastRejected.length > 0) && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Starter question verification</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Every starter question shown to visitors was answered through the bot&apos;s real
+                retrieval pipeline first. Questions that couldn&apos;t be verified are never shown.
+              </p>
+            </div>
+            {verification.length > 0 && (
+              <ul className="space-y-1.5">
+                {verification.map((v) => (
+                  <li key={v.text} className="flex items-start gap-2 text-sm">
+                    <ShieldCheck className="w-4 h-4 text-green-600 shrink-0 mt-0.5" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-gray-900">{v.text}</p>
+                      <p className="text-xs text-gray-400">
+                        Verified answerable — {v.sourceCount} source{v.sourceCount === 1 ? "" : "s"},
+                        {" "}similarity {Math.round(v.topSimilarity * 100)}%
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {verification.length > 0 && verification.length < 5 && (
+              <p className="rounded-md border border-amber-100 bg-amber-50/60 px-3 py-2 text-xs text-gray-700">
+                Only {verification.length} of 5 starter questions could be verified against your current
+                knowledge. Add more content (FAQs, pricing, policies, service pages), then regenerate to
+                unlock the rest — unverifiable questions are never shown to visitors.
+              </p>
+            )}
+            {lastRejected.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-xs text-gray-500 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" aria-hidden />
+                  {lastRejected.length} candidate{lastRejected.length === 1 ? "" : "s"} needed more
+                  knowledge and {lastRejected.length === 1 ? "was" : "were"} not shown
+                </summary>
+                <ul className="mt-2 space-y-1">
+                  {lastRejected.map((r) => (
+                    <li key={r.text} className="text-xs text-gray-500">
+                      <span className="text-gray-700">&ldquo;{r.text}&rdquo;</span> — {r.reason}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

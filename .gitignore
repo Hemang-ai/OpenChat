@@ -45,6 +45,7 @@ next-env.d.ts
 
 # Uploads
 /uploads
+/.data
 
 # Env
 .env

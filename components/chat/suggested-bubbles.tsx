@@ -8,6 +8,8 @@ interface Props {
   onRefresh?: () => void;
   refreshing?: boolean;
   variant?: "widget" | "preview";
+  /** Localized "Try asking" label; defaults to English. */
+  label?: string;
 }
 
 /**
@@ -20,6 +22,7 @@ export default function SuggestedBubbles({
   onRefresh,
   refreshing,
   variant = "widget",
+  label = "Try asking",
 }: Props) {
   if (!questions.length) return null;
   const isPreview = variant === "preview";
@@ -32,7 +35,7 @@ export default function SuggestedBubbles({
             <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-50 animate-ping" />
             <Sparkles className="relative w-3.5 h-3.5 text-blue-600" />
           </span>
-          <span>Try asking</span>
+          <span>{label}</span>
         </div>
         {onRefresh && (
           <button

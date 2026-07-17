@@ -10,14 +10,22 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  passwordHash  String?
-  name          String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  workspaces    Workspace[]
-  oauthAccounts OAuthAccount[]
+  id                     String             @id @default(cuid())
+  email                  String             @unique
+  username               String?            @unique
+  passwordHash           String?
+  name                   String?
+  platformRole           PlatformRole       @default(NONE)
+  mustChangePassword     Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  workspaces             Workspace[]
+  oauthAccounts          OAuthAccount[]
+  auditEvents            AuditEvent[]       @relation("AuditActor")
+  botVersions            BotVersion[]       @relation("BotVersionCreator")
+  workspaceMemberships   WorkspaceMember[]
+  conversationNotes      ConversationNote[]
+  serviceAccountsCreated ServiceAccount[]   @relation("ServiceAccountCreator")
 }
 
 model OAuthAccount {
@@ -34,74 +42,138 @@ model OAuthAccount {
 }
 
 model Workspace {
-  id                   String   @id @default(cuid())
-  name                 String
-  slug                 String   @unique
-  description          String?
+  id                       String                @id @default(cuid())
+  name                     String
+  slug                     String                @unique
+  description              String?
   // Per-workspace AI configuration (each business uses its own keys)
-  llmProvider          String? // primary: "openai" | "anthropic" | "groq" | "ollama" | "gemini"
-  fallbackLlmProvider  String? // used if primary chat call fails
-  openaiApiKey         String?
-  openaiModel          String?
-  openaiEmbeddingModel String?
-  anthropicApiKey      String?
-  anthropicModel       String?
-  groqApiKey           String?
-  groqModel            String?
-  ollamaBaseUrl        String?
-  ollamaModel          String?
-  geminiApiKey         String?
-  geminiModel          String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  ownerId              String
-  owner                User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  bots                 Bot[]
+  llmProvider              String? // primary: "openai" | "anthropic" | "groq" | "ollama" | "gemini"
+  fallbackLlmProvider      String? // used if primary chat call fails
+  openaiApiKey             String?
+  openaiApiKeyEncrypted    String?
+  openaiModel              String?
+  openaiEmbeddingModel     String?
+  anthropicApiKey          String?
+  anthropicApiKeyEncrypted String?
+  anthropicModel           String?
+  groqApiKey               String?
+  groqApiKeyEncrypted      String?
+  groqModel                String?
+  ollamaBaseUrl            String?
+  ollamaModel              String?
+  geminiApiKey             String?
+  geminiApiKeyEncrypted    String?
+  geminiModel              String?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  ownerId                  String
+  owner                    User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bots                     Bot[]
+  auditEvents              AuditEvent[]
+  policy                   Json?
+  retentionPolicy          Json?
+  dataRegion               String                @default("auto")
+  customerKeyReference     String?
+  members                  WorkspaceMember[]
+  invitations              WorkspaceInvitation[]
+  serviceAccounts          ServiceAccount[]
+  ssoConfigurations        SsoConfiguration[]
+  claimedDomains           ClaimedDomain[]
+  privacyRequests          PrivacyRequest[]
+  webhookEndpoints         WebhookEndpoint[]
+  channels                 ChannelConnection[]
+  templates                BotTemplate[]
 }
 
 model Bot {
-  id                          String            @id @default(cuid())
-  name                        String
-  description                 String?
-  publicKey                   String            @unique @default(cuid())
-  welcomeMessage              String            @default("Hello! How can I help you today?")
-  systemPrompt                String?
-  businessContext             String?
-  tone                        String            @default("professional")
-  strictness                  String            @default("strict") // "strict" | "balanced" | "flexible"
-  fallbackBehavior            String            @default("contact") // "contact" | "general_knowledge" | "ask_clarify"
-  contactInfo                 String? // shown when bot can't answer
-  leadCaptureEnabled          Boolean           @default(false)
-  leadCapturePrompt           String            @default("Want us to follow up? Leave your details and our team will reach out.")
-  suggestedQuestions          Json? // cached starter questions auto-generated from knowledge
-  suggestedQuestionsUpdatedAt DateTime?
-  isActive                    Boolean           @default(true)
-  createdAt                   DateTime          @default(now())
-  updatedAt                   DateTime          @updatedAt
-  workspaceId                 String
-  workspace                   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  knowledgeSources            KnowledgeSource[]
-  conversations               Conversation[]
-  leads                       Lead[]
-  tools                       Tool[]
+  id                               String              @id @default(cuid())
+  name                             String
+  description                      String?
+  publicKey                        String              @unique @default(cuid())
+  welcomeMessage                   String              @default("Hello! How can I help you today?")
+  systemPrompt                     String?
+  businessContext                  String?
+  tone                             String              @default("professional")
+  strictness                       String              @default("strict") // "strict" | "balanced" | "flexible"
+  fallbackBehavior                 String              @default("contact") // "contact" | "general_knowledge" | "ask_clarify"
+  contactInfo                      String? // shown when bot can't answer
+  leadCaptureEnabled               Boolean             @default(false)
+  leadCapturePrompt                String              @default("Want us to follow up? Leave your details and our team will reach out.")
+  suggestedQuestions               Json? // cached starter questions auto-generated from knowledge
+  suggestedQuestionsUpdatedAt      DateTime?
+  draftSuggestedQuestions          Json?
+  draftSuggestedQuestionsUpdatedAt DateTime?
+  suggestedQuestionsMeta           Json? // per-question verification records, keyed by language
+  isActive                         Boolean             @default(true)
+  draftConfig                      Json?
+  draftRevision                    Int                 @default(1)
+  publishedVersion                 Int                 @default(0)
+  publishedAt                      DateTime?
+  publishedSourceIds               String[]            @default([])
+  allowedOrigins                   String[]            @default([])
+  privacyNotice                    String              @default("Messages may be processed by AI to answer your questions. Do not share sensitive information.")
+  industryTemplate                 String?
+  createdAt                        DateTime            @default(now())
+  updatedAt                        DateTime            @updatedAt
+  workspaceId                      String
+  workspace                        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  knowledgeSources                 KnowledgeSource[]
+  conversations                    Conversation[]
+  leads                            Lead[]
+  tools                            Tool[]
+  versions                         BotVersion[]
+  evaluationCases                  EvaluationCase[]
+  evaluationRuns                   EvaluationRun[]
+  knowledgeGaps                    KnowledgeGap[]
+  handoffPolicy                    Json?
+  businessHours                    Json?
+  fallbackContactMethod            String?
+  defaultSlaMinutes                Int                 @default(240)
+  budgetMonthlyUsd                 Decimal?            @db.Decimal(12, 2)
+  budgetMode                       BudgetMode          @default(ALERT)
+  defaultLocale                    String              @default("en")
+  supportedLocales                 String[]            @default(["en"])
+  conversationsSummaryPrompt       String?
+  webhookEndpoints                 WebhookEndpoint[]
+  environments                     BotEnvironment[]
+  experiments                      Experiment[]
+  channelConnections               ChannelConnection[]
 }
 
 model KnowledgeSource {
-  id           String          @id @default(cuid())
-  type         SourceType
-  name         String
-  url          String?
-  filePath     String?
-  mimeType     String?
-  fileSize     Int?
-  status       IngestionStatus @default(PENDING)
-  errorMessage String?
-  metadata     Json?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  botId        String
-  bot          Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
-  documents    Document[]
+  id                   String               @id @default(cuid())
+  type                 SourceType
+  name                 String
+  url                  String?
+  filePath             String?
+  mimeType             String?
+  fileSize             Int?
+  status               IngestionStatus      @default(PENDING)
+  errorMessage         String?
+  metadata             Json?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  ownerLabel           String?
+  tags                 String[]             @default([])
+  reviewStatus         SourceReviewStatus   @default(APPROVED)
+  expiresAt            DateTime?
+  lastReviewedAt       DateTime?
+  contentHash          String?
+  conflictStatus       SourceConflictStatus @default(CLEAR)
+  citationVisibility   CitationVisibility   @default(PUBLIC)
+  botId                String
+  bot                  Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  documents            Document[]
+  ingestionJobs        IngestionJob[]
+  resolvedGaps         KnowledgeGap[]
+  crawlConfig          Json?
+  refreshIntervalHours Int?
+  nextRefreshAt        DateTime?
+  lastSyncedAt         DateTime?
+  syncCursor           String?
+  sourceVersion        Int                  @default(1)
+  locale               String               @default("en")
+  governanceScope      String               @default("bot")
 }
 
 model Document {
@@ -128,29 +200,132 @@ model DocumentChunk {
 }
 
 model Conversation {
-  id        String    @id @default(cuid())
-  sessionId String    @unique @default(cuid())
-  botId     String
-  bot       Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  messages  Message[]
-  leads     Lead[]
-  toolExecutions ToolExecution[]
-  userAgent String?
-  ipAddress String?
+  id                 String               @id @default(cuid())
+  sessionId          String               @unique @default(cuid())
+  botId              String
+  bot                Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  messages           Message[]
+  leads              Lead[]
+  toolExecutions     ToolExecution[]
+  userAgent          String?
+  ipAddress          String?
+  botVersion         Int?
+  status             ConversationStatus   @default(AI_ACTIVE)
+  priority           ConversationPriority @default(NORMAL)
+  assignedToLabel    String?
+  summary            String?
+  handoffReason      String?
+  handoffRequestedAt DateTime?
+  slaDueAt           DateTime?
+  resolvedAt         DateTime?
+  visitorName        String?
+  visitorEmail       String?
+  visitorConsent     Boolean              @default(false)
+  locale             String               @default("en")
+  experimentId       String?
+  experimentVariant  String?
+  notes              ConversationNote[]
+  webhookDeliveries  WebhookDelivery[]
 }
 
 model Message {
-  id             String       @id @default(cuid())
-  role           MessageRole
-  content        String
-  isGrounded     Boolean?
-  isRefused      Boolean?
-  sourceChunkIds String[]
-  createdAt      DateTime     @default(now())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id               String           @id @default(cuid())
+  role             MessageRole
+  content          String
+  isGrounded       Boolean?
+  isRefused        Boolean?
+  sourceChunkIds   String[]
+  createdAt        DateTime         @default(now())
+  evidenceScore    Float?
+  latencyMs        Int?
+  conversationId   String
+  conversation     Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  feedback         MessageFeedback?
+  provider         String?
+  model            String?
+  inputTokens      Int?
+  outputTokens     Int?
+  estimatedCostUsd Decimal?         @db.Decimal(12, 6)
+  retrievalTrace   Json?
+}
+
+model BotVersion {
+  id                  String   @id @default(cuid())
+  botId               String
+  bot                 Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  version             Int
+  config              Json
+  sourceSnapshot      Json
+  evaluationSummary   Json?
+  evaluationRunId     String?
+  rollbackFromVersion Int?
+  createdById         String?
+  createdBy           User?    @relation("BotVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt           DateTime @default(now())
+
+  @@unique([botId, version])
+  @@index([botId, createdAt])
+}
+
+model EvaluationCase {
+  id                String              @id @default(cuid())
+  botId             String
+  bot               Bot                 @relation(fields: [botId], references: [id], onDelete: Cascade)
+  question          String
+  expectedAnswer    String?
+  allowRefusal      Boolean             @default(false)
+  requiredSourceIds String[]            @default([])
+  riskLevel         EvaluationRiskLevel @default(MEDIUM)
+  locale            String              @default("en")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([botId, createdAt])
+}
+
+model EvaluationRun {
+  id            String              @id @default(cuid())
+  botId         String
+  bot           Bot                 @relation(fields: [botId], references: [id], onDelete: Cascade)
+  draftRevision Int
+  botVersion    Int?
+  status        EvaluationRunStatus
+  total         Int
+  passed        Int
+  failed        Int
+  results       Json
+  createdAt     DateTime            @default(now())
+
+  @@index([botId, createdAt])
+}
+
+model MessageFeedback {
+  id        String         @id @default(cuid())
+  messageId String         @unique
+  message   Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  rating    FeedbackRating
+  comment   String?
+  createdAt DateTime       @default(now())
+}
+
+model KnowledgeGap {
+  id                 String             @id @default(cuid())
+  botId              String
+  bot                Bot                @relation(fields: [botId], references: [id], onDelete: Cascade)
+  normalizedQuestion String
+  exampleQuestion    String
+  occurrences        Int                @default(1)
+  status             KnowledgeGapStatus @default(OPEN)
+  resolvedSourceId   String?
+  resolvedSource     KnowledgeSource?   @relation(fields: [resolvedSourceId], references: [id], onDelete: SetNull)
+  firstSeenAt        DateTime           @default(now())
+  lastSeenAt         DateTime           @default(now())
+  resolvedAt         DateTime?
+
+  @@unique([botId, normalizedQuestion])
+  @@index([botId, status, occurrences])
 }
 
 model Lead {
@@ -204,24 +379,33 @@ enum LeadStatus {
 // ============================================================================
 
 model Tool {
-  id            String           @id @default(cuid())
-  botId         String
-  bot           Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
-  name          String           // function name exposed to the LLM (snake_case)
-  description   String           // shown to LLM so it knows when to use the tool
+  id                 String           @id @default(cuid())
+  botId              String
+  bot                Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name               String // function name exposed to the LLM (snake_case)
+  description        String // shown to LLM so it knows when to use the tool
   // JSON Schema describing the tool's input parameters (OpenAI-compatible)
-  inputSchema   Json
-  kind          ToolKind         @default(HTTP_REQUEST)
+  inputSchema        Json
+  kind               ToolKind         @default(HTTP_REQUEST)
   // HTTP-specific config (kind = HTTP_REQUEST)
-  method        String?          @default("POST") // GET / POST / PUT / PATCH / DELETE
-  endpoint      String?          // URL with optional {placeholders} for inputs
-  headers       Json?            // map of static request headers (include auth)
+  method             String?          @default("POST") // GET / POST / PUT / PATCH / DELETE
+  endpoint           String? // URL with optional {placeholders} for inputs
+  headers            Json? // map of static request headers (include auth)
+  headersEncrypted   String? // encrypted replacement for legacy headers
   // Approval gating: AUTO runs immediately; REQUIRE_CONFIRM surfaces for user approval
-  approvalMode  ToolApprovalMode @default(AUTO)
-  isActive      Boolean          @default(true)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  executions    ToolExecution[]
+  approvalMode       ToolApprovalMode @default(AUTO)
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  executions         ToolExecution[]
+  riskTier           ToolRiskTier     @default(READ_ONLY)
+  dataClassification String           @default("internal")
+  allowedDomains     String[]         @default([])
+  timeoutMs          Int              @default(12000)
+  version            Int              @default(1)
+  testedAt           DateTime?
+  testStatus         ToolTestStatus   @default(UNTESTED)
+  testSummary        Json?
 
   @@index([botId])
 }
@@ -237,25 +421,534 @@ model ToolExecution {
   errorMessage   String?
   status         ToolExecutionStatus @default(SUCCESS)
   latencyMs      Int?
+  approvalToken  String?             @unique
+  approvedAt     DateTime?
+  completedAt    DateTime?
   createdAt      DateTime            @default(now())
+  idempotencyKey String?             @unique
+  isTest         Boolean             @default(false)
+  riskTier       ToolRiskTier?
 
   @@index([toolId])
   @@index([conversationId])
 }
 
+model IngestionJob {
+  id                String             @id @default(cuid())
+  knowledgeSourceId String
+  knowledgeSource   KnowledgeSource    @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+  status            IngestionJobStatus @default(PENDING)
+  attempts          Int                @default(0)
+  maxAttempts       Int                @default(3)
+  runAfter          DateTime           @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  errorMessage      String?
+  input             Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([status, runAfter])
+  @@index([knowledgeSourceId, createdAt])
+}
+
+model AuditEvent {
+  id          String     @id @default(cuid())
+  type        String
+  actorId     String?
+  actor       User?      @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  ipHash      String?
+  createdAt   DateTime   @default(now())
+
+  @@index([type, createdAt])
+  @@index([actorId, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model PlatformEvent {
+  id          String   @id @default(cuid())
+  type        String
+  botId       String?
+  workspaceId String?
+  origin      String?
+  sessionHash String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([botId, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model PlatformAlert {
+  id             String        @id @default(cuid())
+  fingerprint    String        @unique
+  type           String
+  title          String
+  description    String
+  severity       AlertSeverity
+  status         AlertStatus   @default(OPEN)
+  ownerLabel     String?
+  notes          String?
+  incidentUrl    String?
+  firstSeenAt    DateTime      @default(now())
+  lastSeenAt     DateTime      @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status, severity, lastSeenAt])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(VIEWER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId, role])
+}
+
+model WorkspaceInvitation {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        WorkspaceRole
+  tokenHash   String        @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  acceptedAt  DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([workspaceId, email])
+}
+
+model ConversationNote {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String?
+  author         User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model WebhookEndpoint {
+  id              String            @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  botId           String?
+  bot             Bot?              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name            String
+  url             String
+  events          String[]
+  secretEncrypted String
+  secretVersion   Int               @default(1)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deliveries      WebhookDelivery[]
+
+  @@index([workspaceId, isActive])
+  @@index([botId])
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  endpointId     String
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  event          String
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  maxAttempts    Int                   @default(5)
+  idempotencyKey String                @unique
+  runAfter       DateTime              @default(now())
+  responseCode   Int?
+  responseBody   String?
+  errorMessage   String?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([status, runAfter])
+  @@index([endpointId, createdAt])
+}
+
+model ServiceAccount {
+  id          String          @id @default(cuid())
+  workspaceId String
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  scopes      String[]
+  createdById String?
+  createdBy   User?           @relation("ServiceAccountCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime        @default(now())
+  keys        ServiceApiKey[]
+
+  @@index([workspaceId, revokedAt])
+}
+
+model ServiceApiKey {
+  id               String         @id @default(cuid())
+  serviceAccountId String
+  serviceAccount   ServiceAccount @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
+  prefix           String
+  keyHash          String         @unique
+  lastUsedAt       DateTime?
+  expiresAt        DateTime?
+  revokedAt        DateTime?
+  rateLimitPerHour Int            @default(1000)
+  createdAt        DateTime       @default(now())
+
+  @@index([serviceAccountId, revokedAt])
+}
+
+model SsoConfiguration {
+  id                    String    @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type                  SsoType
+  issuer                String
+  clientId              String?
+  clientSecretEncrypted String?
+  metadataUrl           String?
+  groupMappings         Json?
+  enforced              Boolean   @default(false)
+  isActive              Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([workspaceId, isActive])
+}
+
+model ClaimedDomain {
+  id                    String            @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  domain                String            @unique
+  verificationTokenHash String
+  status                DomainClaimStatus @default(PENDING)
+  verifiedAt            DateTime?
+  createdAt             DateTime          @default(now())
+
+  @@index([workspaceId, status])
+}
+
+model BotEnvironment {
+  id             String          @id @default(cuid())
+  botId          String
+  bot            Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  environment    EnvironmentKind
+  publicKey      String          @unique @default(cuid())
+  activeVersion  Int?
+  pendingVersion Int?
+  approvalStatus PromotionStatus @default(IDLE)
+  requestedById  String?
+  approvedById   String?
+  requestedAt    DateTime?
+  approvedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([botId, environment])
+}
+
+model PrivacyRequest {
+  id           String               @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type         PrivacyRequestType
+  subjectEmail String?
+  subjectHash  String?
+  status       PrivacyRequestStatus @default(OPEN)
+  evidence     Json?
+  requestedAt  DateTime             @default(now())
+  completedAt  DateTime?
+
+  @@index([workspaceId, status, requestedAt])
+}
+
+model PluginManifest {
+  id            String             @id @default(cuid())
+  slug          String             @unique
+  name          String
+  description   String
+  version       String
+  manifest      Json
+  permissions   String[]
+  compatibility String
+  reviewStatus  PluginReviewStatus @default(PENDING)
+  securityNotes String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model ChannelConnection {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  botId           String
+  bot             Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  channel         ChannelKind
+  name            String
+  configEncrypted String?
+  isActive        Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([botId, channel, name])
+}
+
+model BotTemplate {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  slug        String     @unique
+  name        String
+  industry    String
+  description String
+  config      Json
+  locale      String     @default("en")
+  isPublic    Boolean    @default(false)
+  isReviewed  Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Experiment {
+  id             String           @id @default(cuid())
+  botId          String
+  bot            Bot              @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name           String
+  status         ExperimentStatus @default(DRAFT)
+  controlVersion Int
+  variantVersion Int
+  allocation     Int              @default(50)
+  guardrails     Json?
+  metrics        Json?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([botId, status])
+}
+
 enum ToolKind {
-  HTTP_REQUEST  // generic outbound HTTP call (covers 90% of integrations)
-  BUILTIN       // reserved for first-party integrations later (e.g. send_email)
+  HTTP_REQUEST // generic outbound HTTP call (covers 90% of integrations)
+  BUILTIN // reserved for first-party integrations later (e.g. send_email)
 }
 
 enum ToolApprovalMode {
-  AUTO            // run immediately when LLM requests it
+  AUTO // run immediately when LLM requests it
   REQUIRE_CONFIRM // pause and ask the user (preview UI flag)
+}
+
+enum ToolRiskTier {
+  READ_ONLY
+  WRITE
+  EXTERNAL_COMMUNICATION
+  FINANCIAL
+  IDENTITY
+  DESTRUCTIVE
+}
+
+enum ToolTestStatus {
+  UNTESTED
+  PASSED
+  FAILED
+}
+
+enum ConversationStatus {
+  AI_ACTIVE
+  HANDOFF_REQUESTED
+  HUMAN_ACTIVE
+  RESOLVED
+}
+
+enum ConversationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum BudgetMode {
+  ALERT
+  SOFT_LIMIT
+  HARD_LIMIT
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  BUILDER
+  ANALYST
+  SUPPORT_AGENT
+  VIEWER
+}
+
+enum SsoType {
+  OIDC
+  SAML
+}
+
+enum DomainClaimStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+enum EnvironmentKind {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+enum PromotionStatus {
+  IDLE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PrivacyRequestType {
+  EXPORT
+  CORRECT
+  DELETE
+}
+
+enum PrivacyRequestStatus {
+  OPEN
+  VERIFYING
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum PluginReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ChannelKind {
+  WEB
+  API
+  EMAIL
+  SLACK
+  TEAMS
+  WHATSAPP
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
 }
 
 enum ToolExecutionStatus {
   SUCCESS
   ERROR
   PENDING_APPROVAL
+  PROCESSING
   REJECTED
+}
+
+enum PlatformRole {
+  NONE
+  SUPER_ADMIN
+  PLATFORM_ADMIN
+  SUPPORT
+  ANALYST
+  SECURITY_AUDITOR
+}
+
+enum IngestionJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SourceReviewStatus {
+  APPROVED
+  NEEDS_REVIEW
+  ARCHIVED
+}
+
+enum SourceConflictStatus {
+  CLEAR
+  DUPLICATE
+  POSSIBLE_CONFLICT
+}
+
+enum CitationVisibility {
+  PUBLIC
+  HIDDEN
+}
+
+enum EvaluationRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EvaluationRunStatus {
+  PASSED
+  FAILED
+}
+
+enum FeedbackRating {
+  POSITIVE
+  NEGATIVE
+}
+
+enum KnowledgeGapStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
 }

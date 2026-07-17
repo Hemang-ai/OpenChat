@@ -1,5 +1,6 @@
 import { resolveModel } from "./models";
 import type { AgentMessage, AgentTurn, ToolDef } from "@/lib/agents/types";
+import { resolveWorkspaceSecret } from "@/lib/security/secrets";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -382,16 +383,16 @@ export async function getAIConfigForBot(botId: string): Promise<AIConfig> {
   return {
     provider: w.llmProvider,
     fallbackProvider: w.fallbackLlmProvider,
-    openaiApiKey: w.openaiApiKey,
+    openaiApiKey: resolveWorkspaceSecret(w.openaiApiKeyEncrypted, w.openaiApiKey),
     openaiModel: w.openaiModel,
     openaiEmbeddingModel: w.openaiEmbeddingModel,
-    anthropicApiKey: w.anthropicApiKey,
+    anthropicApiKey: resolveWorkspaceSecret(w.anthropicApiKeyEncrypted, w.anthropicApiKey),
     anthropicModel: w.anthropicModel,
-    groqApiKey: w.groqApiKey,
+    groqApiKey: resolveWorkspaceSecret(w.groqApiKeyEncrypted, w.groqApiKey),
     groqModel: w.groqModel,
     ollamaBaseUrl: w.ollamaBaseUrl,
     ollamaModel: w.ollamaModel,
-    geminiApiKey: w.geminiApiKey,
+    geminiApiKey: resolveWorkspaceSecret(w.geminiApiKeyEncrypted, w.geminiApiKey),
     geminiModel: w.geminiModel,
   };
 }

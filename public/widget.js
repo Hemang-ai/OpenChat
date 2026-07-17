@@ -108,17 +108,28 @@
 
   var iframe = document.createElement("iframe");
   iframe.id = "obc-widget-iframe";
-  iframe.src = baseUrl + "/embed/" + botId;
+  iframe.src = baseUrl + "/embed/" + botId + "?origin=" + encodeURIComponent(window.location.origin);
   iframe.title = "Chat";
   iframe.allow = "clipboard-write";
   container.appendChild(iframe);
 
   var isOpen = false;
+  function recordWidgetEvent(type) {
+    try {
+      fetch(baseUrl + "/api/public/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicKey: botId, type: type, origin: window.location.origin }),
+        keepalive: true
+      });
+    } catch { /* analytics must never affect chat availability */ }
+  }
   btn.addEventListener("click", function () {
     isOpen = !isOpen;
     container.className = isOpen ? "obc-visible" : "obc-hidden";
     btn.innerHTML = isOpen ? closeIcon : chatIcon;
     btn.setAttribute("aria-label", isOpen ? "Close chat" : "Open chat");
+    if (isOpen) recordWidgetEvent("widget.opened");
   });
 
   document.body.appendChild(btn);

@@ -18,23 +18,24 @@ const schema = z.object({
   workspaceId: z.string().min(1, "Select a workspace"),
   welcomeMessage: z.string().max(500).optional(),
   businessContext: z.string().max(2000).optional(),
+  industryTemplate: z.enum(["support", "product_discovery", "lead_qualification", "service_booking"]),
 });
 type FormData = z.infer<typeof schema>;
 
 interface Props {
   workspaces: { id: string; name: string }[];
   defaultWorkspaceId?: string;
-  trigger?: React.ReactNode;
+  firstBot?: boolean;
 }
 
-export default function CreateBotDialog({ workspaces, defaultWorkspaceId, trigger }: Props) {
+export default function CreateBotDialog({ workspaces, defaultWorkspaceId, firstBot = false }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { workspaceId: defaultWorkspaceId || workspaces[0]?.id },
+    defaultValues: { workspaceId: defaultWorkspaceId || workspaces[0]?.id, industryTemplate: "support" },
   });
 
   const onSubmit = async (data: FormData) => {
@@ -47,7 +48,7 @@ export default function CreateBotDialog({ workspaces, defaultWorkspaceId, trigge
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      toast({ title: "Bot created!", description: `${data.name} is ready.` });
+      toast({ title: "Draft bot created", description: "Add knowledge, run launch tests, then publish." });
       setOpen(false);
       reset();
       router.push(`/dashboard/bots/${json.bot.id}`);
@@ -62,11 +63,9 @@ export default function CreateBotDialog({ workspaces, defaultWorkspaceId, trigge
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger || (
-          <Button size="sm" className="gap-1">
-            <Plus className="w-4 h-4" /> New bot
-          </Button>
-        )}
+        <Button size="sm" variant={firstBot ? "outline" : "default"} className="gap-1">
+          <Plus className={firstBot ? "h-3 w-3" : "h-4 w-4"} /> {firstBot ? "Create first bot" : "New bot"}
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -87,6 +86,15 @@ export default function CreateBotDialog({ workspaces, defaultWorkspaceId, trigge
               </select>
             </div>
           )}
+          <div className="space-y-1">
+            <Label>Workflow template</Label>
+            <select className="flex min-h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" {...register("industryTemplate")}>
+              <option value="support">Customer support</option>
+              <option value="product_discovery">Product discovery</option>
+              <option value="lead_qualification">Lead qualification</option>
+              <option value="service_booking">Service booking</option>
+            </select>
+          </div>
           <div className="space-y-1">
             <Label>Bot name *</Label>
             <Input placeholder="e.g. Acme Support Bot" {...register("name")} />

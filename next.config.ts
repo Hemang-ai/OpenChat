@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "mammoth", "@prisma/client"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "mammoth", "tesseract.js", "@prisma/client"],
   outputFileTracingIncludes: {
     "/api/admin/bots/*/knowledge": [
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-linux-x64-gnu/**/*",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/tesseract.js-core/**/*",
+      "./node_modules/tesseract.js/src/worker-script/**/*",
     ],
   },
   turbopack: {

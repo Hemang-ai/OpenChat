@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/lib/utils/use-toast";
 
 interface Props {
-  bot: { id: string; name: string; publicKey: string };
+  bot: { id: string; name: string; publicKey: string; allowedOrigins?: string[] };
 }
 
 export default function EmbedTab({ bot }: Props) {
@@ -30,6 +30,7 @@ export default function EmbedTab({ bot }: Props) {
   data-position="bottom-right"
   async
 ></script>`;
+  const testOrigin = bot.allowedOrigins?.[0] || appUrl;
 
   const copy = async (text: string, which: "iframe" | "script") => {
     await navigator.clipboard.writeText(text);
@@ -121,7 +122,7 @@ export default function EmbedTab({ bot }: Props) {
           <CardDescription>Preview how your chatbot looks when embedded</CardDescription>
         </CardHeader>
         <CardContent>
-          <a href={`/embed/${bot.publicKey}`} target="_blank" rel="noopener noreferrer">
+          <a href={`/embed/${bot.publicKey}?origin=${encodeURIComponent(testOrigin)}`} target="_blank" rel="noopener noreferrer">
             <Button variant="outline" className="gap-2">
               <Globe className="w-4 h-4" /> Open embed page
             </Button>

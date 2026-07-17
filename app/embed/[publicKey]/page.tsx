@@ -1,7 +1,7 @@
 import { Metadata } from "next";
-import { db } from "@/lib/db/client";
 import EmbedChat from "@/components/chat/embed-chat";
 import { getSuggestedQuestions } from "@/lib/rag/suggested-questions";
+import { resolvePublicBotKey } from "@/lib/bots/public-key";
 
 export async function generateMetadata({
   params,
@@ -9,10 +9,7 @@ export async function generateMetadata({
   params: Promise<{ publicKey: string }>;
 }): Promise<Metadata> {
   const { publicKey } = await params;
-  const bot = await db.bot.findUnique({
-    where: { publicKey },
-    select: { name: true },
-  });
+  const bot = (await resolvePublicBotKey(publicKey))?.bot;
   return {
     title: bot ? `${bot.name} — Chat` : "Chat",
   };
@@ -20,25 +17,18 @@ export async function generateMetadata({
 
 export default async function EmbedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ publicKey: string }>;
+  searchParams: Promise<{ origin?: string }>;
 }) {
   const { publicKey } = await params;
+  const { origin } = await searchParams;
 
-  const bot = await db.bot.findUnique({
-    where: { publicKey },
-    select: {
-      id: true,
-      name: true,
-      welcomeMessage: true,
-      isActive: true,
-      suggestedQuestions: true,
-      leadCaptureEnabled: true,
-      leadCapturePrompt: true,
-    },
-  });
+  const resolved = await resolvePublicBotKey(publicKey);
+  const bot = resolved?.bot;
 
-  if (!bot || !bot.isActive) {
+  if (!bot || !resolved || !bot.isActive || resolved.version < 1) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -55,7 +45,7 @@ export default async function EmbedPage({
   // Lazy-generate on first request if missing (e.g. bot created before this feature)
   if (suggestedQuestions.length === 0) {
     try {
-      suggestedQuestions = await getSuggestedQuestions(bot.id);
+      suggestedQuestions = await getSuggestedQuestions(bot.id, false, false);
     } catch (err) {
       console.warn("Failed to load suggested questions for embed:", err);
     }
@@ -70,6 +60,10 @@ export default async function EmbedPage({
         suggestedQuestions={suggestedQuestions}
         leadCaptureEnabled={bot.leadCaptureEnabled}
         leadCapturePrompt={bot.leadCapturePrompt}
+        privacyNotice={bot.privacyNotice}
+        initialOrigin={origin}
+        defaultLocale={bot.defaultLocale}
+        supportedLocales={bot.supportedLocales}
       />
     </div>
   );

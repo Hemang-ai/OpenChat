@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/jwt";
 import { db } from "@/lib/db/client";
+import { workspaceAccessWhere } from "@/lib/auth/workspace-access";
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const workspaces = await db.workspace.findMany({
-    where: { ownerId: session.userId },
+    where: workspaceAccessWhere(session.userId),
     include: {
       bots: { select: { id: true, name: true, isActive: true, publicKey: true } },
     },

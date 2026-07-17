@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/jwt";
-import { db } from "@/lib/db/client";
 import {
   generateSuggestedQuestions,
   getSuggestedQuestions,
+  getVerificationMeta,
 } from "@/lib/rag/suggested-questions";
+import { db } from "@/lib/db/client";
+import { canAccessBot } from "@/lib/auth/workspace-access";
 
 export async function GET(
   _req: NextRequest,
@@ -14,14 +16,17 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { botId } = await params;
 
-  const bot = await db.bot.findFirst({
-    where: { id: botId, workspace: { ownerId: session.userId } },
-  });
-  if (!bot) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!await canAccessBot(botId, session.userId, "bot:read")) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {
     const questions = await getSuggestedQuestions(botId);
-    return NextResponse.json({ questions });
+    const bot = await db.bot.findUnique({ where: { id: botId }, select: { defaultLocale: true } });
+    const meta = await getVerificationMeta(botId);
+    return NextResponse.json({
+      questions,
+      verification: meta.byLanguage[bot?.defaultLocale || "en"] || [],
+      lastRejected: meta.lastRejected || [],
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed" },
@@ -38,14 +43,17 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { botId } = await params;
 
-  const bot = await db.bot.findFirst({
-    where: { id: botId, workspace: { ownerId: session.userId } },
-  });
-  if (!bot) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!await canAccessBot(botId, session.userId, "bot:write")) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {
     const questions = await generateSuggestedQuestions(botId);
-    return NextResponse.json({ questions });
+    const bot = await db.bot.findUnique({ where: { id: botId }, select: { defaultLocale: true } });
+    const meta = await getVerificationMeta(botId);
+    return NextResponse.json({
+      questions,
+      verification: meta.byLanguage[bot?.defaultLocale || "en"] || [],
+      lastRejected: meta.lastRejected || [],
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed" },

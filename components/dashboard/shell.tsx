@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
-import { Bot, LayoutDashboard, LogOut, Menu, GitBranch, Settings } from "lucide-react";
+import { Bot, LayoutDashboard, LogOut, Menu, GitBranch, Settings, ShieldCheck } from "lucide-react";
 import { toast } from "@/lib/utils/use-toast";
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -19,6 +19,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/settings", label: "AI Settings", icon: Settings },
+    { href: "/dashboard/governance", label: "Governance", icon: ShieldCheck },
   ];
 
   return (

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
+import { getClientIp, getPublicChatRateLimitConfig, rateLimit, rateLimitHeaders } from "@/lib/security/rate-limit";
+import { writeAuditEvent } from "@/lib/security/audit";
+import { isOriginAllowed } from "@/lib/bots/origin-policy";
+import { queueWebhookEvent } from "@/lib/integrations/webhooks";
+import { isProductionVersionApproved } from "@/lib/bots/production-policy";
+import { resolvePublicBotKey } from "@/lib/bots/public-key";
 
 const optionalText = (max: number) =>
   z
@@ -18,47 +24,39 @@ const leadSchema = z.object({
   phone: optionalText(50),
   company: optionalText(120),
   message: optionalText(1000),
+  origin: z.string().url().max(500).optional(),
 });
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 5;
-const RATE_WINDOW_MS = 5 * 60 * 1000;
-
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
-
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for") || "unknown";
+  const ip = getClientIp(req);
 
   try {
     const body = await req.json();
     const data = leadSchema.parse(body);
 
-    const rateLimitKey = `${data.publicKey}:${ip}:lead`;
-    if (!checkRateLimit(rateLimitKey)) {
+    const config = getPublicChatRateLimitConfig();
+    const limit = await rateLimit({
+      key: `${data.publicKey}:${ip}:lead`,
+      namespace: "public-leads",
+      limit: Math.min(config.limit, 5),
+      windowSeconds: Math.max(config.windowSeconds, 300),
+    });
+    const headers = rateLimitHeaders(limit);
+    if (!limit.allowed) {
       return NextResponse.json(
         { error: "Too many lead submissions. Please wait a moment." },
-        { status: 429 }
+        { status: 429, headers }
       );
     }
 
-    const bot = await db.bot.findUnique({
-      where: { publicKey: data.publicKey },
-      select: { id: true, isActive: true, leadCaptureEnabled: true },
-    });
+    const resolved = await resolvePublicBotKey(data.publicKey);
+    const bot = resolved?.bot;
 
-    if (!bot || !bot.isActive || !bot.leadCaptureEnabled) {
+    if (!bot || !bot.isActive || bot.publishedVersion < 1 || !bot.leadCaptureEnabled) {
       return NextResponse.json({ error: "Lead capture is not available" }, { status: 404 });
     }
+    if (!resolved.environment && !(await isProductionVersionApproved(bot.id, bot.publishedVersion))) return NextResponse.json({ error: "Lead capture is awaiting production approval" }, { status: 503 });
+    if (!isOriginAllowed(bot.allowedOrigins, data.origin)) return NextResponse.json({ error: "Lead capture is not approved for this website" }, { status: 403 });
 
     const conversation = data.sessionId
       ? await db.conversation.findFirst({
@@ -97,7 +95,22 @@ export async function POST(req: NextRequest) {
           select: { id: true, status: true },
         });
 
-    return NextResponse.json({ lead });
+    await writeAuditEvent({
+      type: "lead.captured",
+      targetType: "lead",
+      targetId: lead.id,
+      metadata: { botId: bot.id, hasConversation: Boolean(conversation) },
+      ip,
+    });
+    await queueWebhookEvent({
+      workspaceId: bot.workspaceId,
+      botId: bot.id,
+      conversationId: conversation?.id,
+      event: "lead.created",
+      idempotencyKey: `lead:${lead.id}`,
+      payload: { leadId: lead.id, ...leadData },
+    });
+    return NextResponse.json({ lead }, { headers });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues[0]?.message || err.message }, { status: 400 });

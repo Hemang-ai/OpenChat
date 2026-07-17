@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserPlus } from "lucide-react";
+import { Languages, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Select, MultiSelect, SelectOption } from "@/components/ui/select";
+import { getLanguagePickerOptions } from "@/lib/i18n/languages";
 import { toast } from "@/lib/utils/use-toast";
 
 const schema = z.object({
@@ -25,8 +27,37 @@ const schema = z.object({
   leadCaptureEnabled: z.boolean(),
   leadCapturePrompt: z.string().max(240).optional(),
   isActive: z.boolean(),
+  allowedOriginsText: z.string().max(3000),
+  privacyNotice: z.string().min(20).max(1000),
+  industryTemplate: z.enum(["support", "product_discovery", "lead_qualification", "service_booking"]),
+  defaultLocale: z.string().min(2),
+  supportedLocales: z.array(z.string()).min(1),
 });
 type FormData = z.infer<typeof schema>;
+
+// Native-script name first, English name + code as the secondary line.
+// Popular languages are pinned in a labeled group above the searchable list.
+const languageOptions: SelectOption[] = getLanguagePickerOptions();
+
+const toneOptions: SelectOption[] = [
+  { value: "professional", label: "Professional", description: "Formal, business-like replies" },
+  { value: "friendly", label: "Friendly", description: "Warm and approachable" },
+  { value: "concise", label: "Concise", description: "Short answers, bullet points" },
+  { value: "detailed", label: "Detailed", description: "Thorough answers with examples" },
+];
+
+const fallbackOptions: SelectOption[] = [
+  { value: "contact", label: "Direct to your contact info", description: "Warm apology + your email/phone (default)" },
+  { value: "ask_clarify", label: "Ask the visitor to rephrase", description: "Invites more detail so the bot can retry" },
+  { value: "general_knowledge", label: "Offer general info + suggest contact", description: "Shares general context, points to your team for specifics" },
+];
+
+const templateOptions: SelectOption[] = [
+  { value: "support", label: "Customer support", description: "Answer product and policy questions" },
+  { value: "product_discovery", label: "Product discovery", description: "Help visitors find the right product" },
+  { value: "lead_qualification", label: "Lead qualification", description: "Qualify and capture sales leads" },
+  { value: "service_booking", label: "Service booking", description: "Guide visitors toward booking services" },
+];
 
 interface Props {
   bot: {
@@ -43,6 +74,12 @@ interface Props {
     leadCaptureEnabled: boolean;
     leadCapturePrompt: string;
     isActive: boolean;
+    allowedOrigins: string[];
+    privacyNotice: string;
+    industryTemplate?: string | null;
+    publishedVersion: number;
+    defaultLocale?: string;
+    supportedLocales?: string[];
   };
 }
 
@@ -50,7 +87,7 @@ export default function BotSettingsTab({ bot }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, control, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: bot.name,
@@ -67,20 +104,33 @@ export default function BotSettingsTab({ bot }: Props) {
       leadCaptureEnabled: bot.leadCaptureEnabled,
       leadCapturePrompt: bot.leadCapturePrompt || "Want us to follow up? Leave your details and our team will reach out.",
       isActive: bot.isActive,
+      allowedOriginsText: bot.allowedOrigins.join("\n"),
+      privacyNotice: bot.privacyNotice,
+      industryTemplate: (bot.industryTemplate || "support") as FormData["industryTemplate"],
+      defaultLocale: bot.defaultLocale || "en",
+      supportedLocales: bot.supportedLocales?.length ? bot.supportedLocales : ["en"],
     },
   });
 
   const onSubmit = async (data: FormData) => {
     setSaving(true);
+    // The default language is always chat-enabled.
+    if (!data.supportedLocales.includes(data.defaultLocale)) {
+      data.supportedLocales = [data.defaultLocale, ...data.supportedLocales];
+    }
     try {
       const res = await fetch(`/api/admin/bots/${bot.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          allowedOrigins: data.allowedOriginsText.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
+          allowedOriginsText: undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      toast({ title: "Settings saved" });
+      toast({ title: "Draft saved", description: "Run evaluations and publish from the Launch tab when ready." });
       router.refresh();
     } catch (err) {
       toast({ title: "Save failed", description: err instanceof Error ? err.message : "Error", variant: "destructive" });
@@ -96,6 +146,17 @@ export default function BotSettingsTab({ bot }: Props) {
           <CardTitle className="text-base">Bot information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label>Business workflow template</Label>
+            <Controller
+              control={control}
+              name="industryTemplate"
+              render={({ field }) => (
+                <Select options={templateOptions} value={field.value} onChange={field.onChange} ariaLabel="Business workflow template" />
+              )}
+            />
+            <p className="text-xs text-gray-400">Templates set sensible workflow defaults without inserting business facts.</p>
+          </div>
           <div className="space-y-1">
             <Label>Bot name *</Label>
             <Input {...register("name")} />
@@ -129,12 +190,13 @@ export default function BotSettingsTab({ bot }: Props) {
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <Label>Tone</Label>
-            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm" {...register("tone")}>
-              <option value="professional">Professional</option>
-              <option value="friendly">Friendly</option>
-              <option value="concise">Concise</option>
-              <option value="detailed">Detailed</option>
-            </select>
+            <Controller
+              control={control}
+              name="tone"
+              render={({ field }) => (
+                <Select options={toneOptions} value={field.value} onChange={field.onChange} ariaLabel="Tone" />
+              )}
+            />
           </div>
           <div className="space-y-2">
             <Label>Answer mode (controls hallucination)</Label>
@@ -188,14 +250,13 @@ export default function BotSettingsTab({ bot }: Props) {
             <p className="text-xs text-gray-500">
               How should the bot respond when the user asks something not in the knowledge base?
             </p>
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-              {...register("fallbackBehavior")}
-            >
-              <option value="contact">Apologize and direct to your contact info (default)</option>
-              <option value="ask_clarify">Ask the user to rephrase or clarify</option>
-              <option value="general_knowledge">Offer general info + suggest contacting the business</option>
-            </select>
+            <Controller
+              control={control}
+              name="fallbackBehavior"
+              render={({ field }) => (
+                <Select options={fallbackOptions} value={field.value} onChange={field.onChange} ariaLabel="Fallback behavior" />
+              )}
+            />
           </div>
 
           <div className="space-y-1">
@@ -205,7 +266,78 @@ export default function BotSettingsTab({ bot }: Props) {
           </div>
           <div className="flex items-center gap-3">
             <input type="checkbox" id="isActive" {...register("isActive")} className="w-4 h-4 rounded" />
-            <Label htmlFor="isActive">Bot is active (public embed will work)</Label>
+            <Label htmlFor="isActive">Bot should be active after the next publish</Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Languages className="w-4 h-4 text-gray-500" />
+            <CardTitle className="text-base">Languages</CardTitle>
+          </div>
+          <CardDescription>
+            Choose the languages visitors can chat in. The widget detects each visitor&apos;s
+            browser language automatically and lets them switch at any time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label>Primary language</Label>
+            <Controller
+              control={control}
+              name="defaultLocale"
+              render={({ field }) => (
+                <Select
+                  options={languageOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                  ariaLabel="Primary language"
+                  placeholder="Select a language"
+                />
+              )}
+            />
+            <p className="text-xs text-gray-400">The language of your knowledge base and default replies.</p>
+          </div>
+          <div className="space-y-1">
+            <Label>Additional visitor languages</Label>
+            <Controller
+              control={control}
+              name="supportedLocales"
+              render={({ field }) => (
+                <MultiSelect
+                  options={languageOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                  ariaLabel="Enabled visitor languages"
+                  placeholder="Select languages"
+                />
+              )}
+            />
+            <p className="text-xs text-gray-400">
+              Visitors chatting in these languages get answers translated from your knowledge base —
+              the bot never invents facts to fill language gaps.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Website access and privacy</CardTitle>
+          <CardDescription>Restrict where the published widget can run and explain how AI processes messages.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label>Approved website origins</Label>
+            <Textarea {...register("allowedOriginsText")} rows={4} placeholder={"https://example.com\nhttps://www.example.com"} className="font-mono text-xs" />
+            <p className="text-xs text-gray-400">One origin per line, including https://. Leave empty during local testing; add production domains before launch.</p>
+          </div>
+          <div className="space-y-1">
+            <Label>Visitor AI and privacy notice</Label>
+            <Textarea {...register("privacyNotice")} rows={3} />
+            {errors.privacyNotice && <p className="text-xs text-red-500">{errors.privacyNotice.message}</p>}
           </div>
         </CardContent>
       </Card>
@@ -265,8 +397,9 @@ export default function BotSettingsTab({ bot }: Props) {
       </Card>
 
       <Button type="submit" disabled={saving || !isDirty}>
-        {saving ? "Saving..." : "Save settings"}
+        {saving ? "Saving draft..." : "Save draft settings"}
       </Button>
+      <p className="text-xs text-gray-400">{bot.publishedVersion ? `Website visitors remain on version ${bot.publishedVersion} until you publish.` : "This bot is not public until its first successful publish."}</p>
     </form>
   );
 }

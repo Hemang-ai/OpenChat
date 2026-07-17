@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/jwt";
 import { db } from "@/lib/db/client";
+import { canAccessBot } from "@/lib/auth/workspace-access";
 
 const leadStatuses = ["NEW", "CONTACTED", "QUALIFIED", "DISMISSED"] as const;
 type LeadStatus = (typeof leadStatuses)[number];
@@ -16,10 +17,7 @@ function isLeadStatus(value: string | null): value is LeadStatus {
 }
 
 async function getOwnedBot(botId: string, userId: string) {
-  return db.bot.findFirst({
-    where: { id: botId, workspace: { ownerId: userId } },
-    select: { id: true },
-  });
+  return canAccessBot(botId, userId, "conversation:write");
 }
 
 export async function GET(

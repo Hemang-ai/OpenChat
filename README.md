@@ -7,7 +7,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791)](https://github.com/pgvector/pgvector)
 
-> **Current main:** Google OAuth, lead capture, and agentic HTTP actions are live. Tools use native function-calling with OpenAI and Anthropic.
+> **Current main:** PRD Phases 0-4 are implemented as an open platform foundation: verified publishing, service operations and handoff, enterprise governance, versioned APIs/SCIM, multilingual and channel contracts, templates, reviewed plugins, and stable-session experiments.
 > Self-hostable, bring-your-own-key, and MIT licensed. Live deployment: [open-chat1.vercel.app](https://open-chat1.vercel.app).
 
 ---
@@ -37,10 +37,11 @@ OpenBusinessChat lets a business create a custom AI chatbot grounded in its own 
 | PostgreSQL + pgvector with prepared migrations | ✅ |
 | Admin dashboard (workspace selector, bot CRUD, settings) | ✅ |
 | Per-workspace AI provider config (OpenAI / Anthropic / Gemini / Groq / Ollama) | ✅ |
+| AES-256-GCM encrypted workspace provider keys and tool headers | ✅ |
 | Primary + fallback provider chain with auto-failover | ✅ |
 | Curated model catalog with "Auto (recommended)" defaults | ✅ |
-| File upload (PDF, DOCX, TXT, MD, CSV — up to 10 MB) | ✅ |
-| Website URL ingestion (single-page with noise stripping) | ✅ |
+| File upload (PDF with local scanned-page OCR, DOCX, TXT, MD, CSV — up to 10 MB) | ✅ |
+| Website crawler (same-origin depth/page/path limits, noise stripping, scheduled refresh) | ✅ |
 | YouTube transcript extraction | ✅ |
 | Manual text knowledge entry | ✅ |
 | Sliding-window chunking + batched embeddings | ✅ |
@@ -55,10 +56,26 @@ OpenBusinessChat lets a business create a custom AI chatbot grounded in its own 
 | Drop-in `<script>` widget (`widget.js`) — floating chat bubble | ✅ |
 | Conversation logs viewer | ✅ |
 | Analytics: totals, unknown-answer rate, top user questions | ✅ |
+| Platform-owner `/admin` dashboard: signups, activation, installs, usage, ingestion, tool, and security metrics | ✅ |
 | Animated end-to-end flow demo on the landing page | ✅ |
 | **Agentic tools** — bot calls HTTP APIs via function-calling (OpenAI + Anthropic) | ✅ |
 | **Tool execution log** with input/output, latency, status per invocation | ✅ |
-| **Approval gating foundation** — records pending approvals; approval/resume UI is next | 🟡 |
+| **Approval-required tool actions** — review, reject, approve, and execute from the existing tool log | ✅ |
+| Persistent ingestion job records with retry/error lifecycle | ✅ |
+| Guided launch readiness with required and recommended checks | ✅ |
+| Draft settings, immutable publish versions, and rollback | ✅ |
+| Per-bot evaluation datasets with publish quality gates | ✅ |
+| Extraction preview, source ownership, tags, freshness, conflicts, and citation controls | ✅ |
+| Verified starter questions, public citations, answer feedback, and knowledge-gap inbox | ✅ |
+| Widget AI disclosure, privacy notice, origin restrictions, and offline states | ✅ |
+| Quality analytics: evidence coverage, feedback, latency, refusals, and gaps | ✅ |
+| Shared service workflow: escalation, packets, assignment, notes, priority, business hours, and SLA | ✅ |
+| Signed/idempotent webhook delivery with logs, retries, and helpdesk/CRM contract | ✅ |
+| Risk-tiered tool test console with immutable test executions | ✅ |
+| Outcome, containment, action, provider/model, token, and estimated-cost analytics | ✅ |
+| Workspace roles/invitations, scoped service accounts, stable `/api/v1`, and SCIM | ✅ |
+| Environments, policy, domains, retention/privacy jobs, and audit export | ✅ |
+| Locale-aware chat/evaluations, channels, templates, plugin manifest, and experiments | ✅ |
 | MIT licensed, fully self-hostable | ✅ |
 
 ---
@@ -92,7 +109,7 @@ docker compose up -d postgres
 
 # 5. Run migrations
 npx prisma generate
-npx prisma migrate deploy
+npm run db:deploy
 
 # 6. Start the dev server
 npm run dev
@@ -103,11 +120,58 @@ Open **[http://localhost:3000](http://localhost:3000)**.
 ### First-time flow
 1. **Register** with Google or email/password → an account + workspace are created
 2. **AI Settings** → paste your OpenAI API key, click Save
-3. **Dashboard → + New bot** → give it a name
-4. **Bot → Knowledge tab** → upload a PDF or paste manual text → wait for `COMPLETED`
-5. **Bot → Preview tab** → click a starter suggestion or ask a question
-6. **Bot → Settings tab** → optionally enable lead capture for human follow-up
-7. **Bot → Embed tab** → copy the `<iframe>` or `<script>` snippet → paste into any website
+3. **Dashboard → + New bot** → choose a workflow template and create an unpublished draft
+4. **Bot → Knowledge** → add business content, inspect extraction, and approve any conflict or freshness warnings
+5. **Bot → Evaluations** → add at least three launch questions with expected facts or expected refusals, then run the suite
+6. **Bot → Preview** → test the same draft answer path with full evidence traces
+7. **Bot → Settings / Embed** → add human fallback, privacy notice, and approved website origins
+8. **Bot → Launch** → resolve required checks and publish an immutable version
+9. **Bot → Embed** → copy the `<iframe>` or `<script>` snippet into an approved website
+
+Published visitors stay on the last known-good version while settings or knowledge changes remain in draft. Rollback creates a new immutable version from an earlier snapshot, preserving the audit trail.
+
+### Platform administrator
+
+The platform-owner dashboard is separate from customer workspaces at **`/admin`**. It shows signups, activation, bots, verified embeds, conversations, leads, ingestion health, tool activity, and recorded security events.
+
+After running the latest migrations, create the one-time local administrator. The username defaults to `admin`; do not place a real password in Git or `.env.example`.
+
+```bash
+# Generate a durable workspace encryption key first.
+openssl rand -base64 32
+
+# Put the resulting value in WORKSPACE_SECRETS_KEY in your uncommitted .env.
+# Set a unique 15+ character PLATFORM_ADMIN_INITIAL_PASSWORD in .env, then:
+npm run admin:bootstrap
+```
+
+Sign in using the configured email or `admin`, open [http://localhost:3000/admin](http://localhost:3000/admin), and replace the bootstrap password when prompted. Bootstrap can only create the first platform administrator.
+
+To protect existing workspace keys after setting `WORKSPACE_SECRETS_KEY`, run:
+
+```bash
+npm run secrets:migrate
+```
+
+### Processing pending ingestion jobs
+
+Knowledge submissions run immediately for a responsive dashboard experience and are also recorded as durable jobs. For a production worker, set a strong `INGESTION_WORKER_SECRET` and invoke the protected endpoint from a queue consumer or scheduler:
+
+```bash
+curl -X POST "$APP_URL/api/internal/ingestion-jobs" \
+  -H "Authorization: Bearer $INGESTION_WORKER_SECRET"
+```
+
+The worker processes every source type, including uploaded files. Development stores uploads under ignored `.data/uploads`; production uses the configured private S3-compatible bucket, so retries survive deployments and request timeouts.
+
+Run webhook and governance maintenance workers on the same schedule (five minutes recommended):
+
+```bash
+curl -X POST "$APP_URL/api/internal/webhooks" -H "Authorization: Bearer $WEBHOOK_WORKER_SECRET"
+curl -X POST "$APP_URL/api/internal/maintenance" -H "Authorization: Bearer $MAINTENANCE_WORKER_SECRET"
+```
+
+See [Production Operations](docs/OPERATIONS.md) for SLOs, backup/restore, migration, worker, and rollback procedures.
 
 ---
 
@@ -157,7 +221,7 @@ After pulling the latest `main`, run:
 
 ```bash
 npx prisma generate
-npx prisma migrate deploy
+npm run db:deploy
 ```
 
 ---
@@ -216,16 +280,17 @@ app/
   (marketing)/        Landing page + animated demo
   (dashboard)/        Admin UI (workspace, bots, AI settings)
   api/auth/           Email/password + Google OAuth, logout
-  api/admin/          Workspace + bot CRUD, knowledge upload, chat preview,
-                      analytics, leads, logs, suggested-questions
-  api/public/         Anonymous chat + lead capture endpoints (keyed by publicKey)
+  api/admin/          Workspace + bot CRUD, knowledge, evaluations, launch/versioning,
+                      analytics, gaps, leads, logs, and tools
+  api/public/         Chat, citations, feedback, leads, and verified embed events
   embed/[publicKey]/  Iframe-embeddable chat widget
   login/, register/   Auth pages
 
 components/
   ui/                 shadcn/ui design system
   chat/               Public-facing chat widget, lead form, suggestion bubbles
-  dashboard/          Tabs: knowledge, preview, embed, analytics, leads, logs, settings
+  dashboard/          Tabs: launch, knowledge, evaluations, preview, embed,
+                      analytics, gaps, leads, logs, tools, and settings
   marketing/          Landing animations (FlowAnimation, DashboardMockup)
 
 lib/
@@ -233,10 +298,12 @@ lib/
   ai/                 Provider abstraction + curated model catalog
   auth/               JWT, bcrypt, and Google OAuth helpers
   db/                 Prisma client singleton
-  ingestion/          Chunker + pipeline orchestrator
-  loaders/            PDF, DOCX, website, YouTube, Google Drive (placeholder)
-  rag/                Chat engine, retrieval, suggested-questions generator
-  security/           Upstash/in-memory rate limiting
+  bots/               Draft config, readiness, publish/version, rollback, origin policy
+  evaluations/        Deterministic launch evaluation runner
+  ingestion/          Chunker, quality checks, jobs, and pipeline orchestrator
+  loaders/            PDF/OCR, DOCX, crawler, YouTube, and incremental Google Drive contract
+  rag/                Chat, retrieval, verified suggestions, and knowledge gaps
+  security/           Rate limiting, audit events, safe fetch, encrypted secrets
   utils/              Zod helpers, classnames, toast
 
 prisma/
@@ -258,6 +325,8 @@ DATABASE_URL="postgresql://postgres:password@localhost:5432/openbusinesschat?sch
 JWT_SECRET="your-32-char-random-secret"
 APP_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
+WORKSPACE_SECRETS_KEY="" # 32-byte base64 or 64-character hex; required for encrypted workspace secrets
+AUDIT_HASH_SALT=""       # optional, separate privacy salt for audit/event identifiers
 
 # Google sign-in (optional)
 GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
@@ -280,11 +349,25 @@ OLLAMA_MODEL=""
 
 # Uploads and public API protection
 MAX_FILE_SIZE_MB="10"
+OBJECT_STORAGE_BUCKET=""             # required in production; S3, R2, MinIO, or compatible
+OBJECT_STORAGE_REGION="auto"
+OBJECT_STORAGE_ENDPOINT=""           # required for R2/MinIO; omit for AWS S3
+OBJECT_STORAGE_ACCESS_KEY_ID=""
+OBJECT_STORAGE_SECRET_ACCESS_KEY=""
+OBJECT_STORAGE_FORCE_PATH_STYLE="false"
 UPSTASH_REDIS_REST_URL=""
 UPSTASH_REDIS_REST_TOKEN=""
 PUBLIC_CHAT_RATE_LIMIT_REQUESTS="30"
 PUBLIC_CHAT_RATE_LIMIT_WINDOW_SECONDS="60"
 RATE_LIMIT_FAIL_OPEN="false"
+
+# One-time platform admin bootstrap. Keep the real password only in a secret manager or local .env.
+PLATFORM_ADMIN_USERNAME="admin"
+PLATFORM_ADMIN_EMAIL="admin@localhost"
+PLATFORM_ADMIN_INITIAL_PASSWORD=""
+INGESTION_WORKER_SECRET=""
+WEBHOOK_WORKER_SECRET=""
+MAINTENANCE_WORKER_SECRET=""
 ```
 
 Workspace-level settings (entered via the dashboard) **always override** these defaults.
@@ -317,15 +400,18 @@ The callback must match exactly, including scheme, hostname, port, path, and tra
 
 ### Vercel + cloud Postgres
 1. **Database**: Provision Neon from the Vercel Marketplace or use another PostgreSQL host with pgvector. The initial migration enables the `vector` extension.
-2. **Core secrets**: Set `JWT_SECRET`, `APP_URL`, and `NEXT_PUBLIC_APP_URL` in Vercel. A Neon Marketplace connection supplies `DATABASE_URL` automatically.
-3. **Google login**: Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then add the exact production callback in Google Cloud.
-4. **Public chat rate limiting**: Upstash Redis is recommended for distributed enforcement. Without it, the app uses a bounded per-instance limiter so public chat remains available. Set `RATE_LIMIT_REQUIRE_DISTRIBUTED=true` if your deployment must fail closed when Redis is absent. `RATE_LIMIT_FAIL_OPEN=true` applies only when a configured Redis service becomes unavailable.
-5. **Deploy**: `npm run build` generates Prisma, applies committed migrations with `prisma migrate deploy`, and builds Next.js.
-6. Visit the production URL and test registration, bot creation, ingestion, preview chat, and the public embed separately.
+2. **Core secrets**: Set `JWT_SECRET`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, `WORKSPACE_SECRETS_KEY`, and preferably `AUDIT_HASH_SALT` in Vercel. A Neon Marketplace connection supplies `DATABASE_URL` automatically.
+3. **Private uploads**: Attach an S3-compatible private bucket and set the `OBJECT_STORAGE_*` variables. Uploaded documents are encrypted at rest, tenant-scoped, and read by retryable ingestion workers.
+4. **Google login**: Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then add the exact production callback in Google Cloud.
+5. **Public chat rate limiting**: Upstash Redis is recommended for distributed enforcement. Without it, the app uses a bounded per-instance limiter so public chat remains available. Set `RATE_LIMIT_REQUIRE_DISTRIBUTED=true` if your deployment must fail closed when Redis is absent. `RATE_LIMIT_FAIL_OPEN=true` applies only when a configured Redis service becomes unavailable.
+6. **Apply migrations**: From a trusted CI job or a machine with the production `DATABASE_URL`, run `npm run db:deploy`. Apply this before the Vercel deployment so the running application always sees the expected schema.
+7. **Deploy**: Vercel runs `npm run build`, which generates Prisma and builds Next.js without coupling the build to a live database connection.
+8. Configure authenticated five-minute jobs for `/api/internal/ingestion-jobs`, `/api/internal/webhooks`, and `/api/internal/maintenance`.
+9. Visit `/api/health`, then test registration, bot creation, ingestion, preview, publish/promotion, public embed, handoff, webhook delivery, `/admin` authorization, service API, and a tool approval separately.
 
 The reference deployment uses Vercel at [open-chat1.vercel.app](https://open-chat1.vercel.app) with a Vercel Marketplace Neon database.
 
-> **Serverless ingestion:** uploaded files are parsed from the request buffer and are never written to Vercel's read-only application directory. The route waits for extraction, chunking, embeddings, vector storage, and source status updates before returning. This makes files, URLs, YouTube transcripts, and manual text reliable on Vercel for the current 10 MB limit. For larger files or high-volume ingestion, move the same pipeline behind object storage and a durable queue.
+> **Serverless ingestion:** uploads are written to private S3-compatible storage before a durable ingestion job is executed. The same persisted job can be retried by `/api/internal/ingestion-jobs` after a timeout or deployment. Development uses the ignored local object store; production deliberately fails upload setup when no private bucket is configured.
 
 ### Docker (self-host)
 ```bash
@@ -338,34 +424,37 @@ A production `Dockerfile` is included for one-shot containerization if you prefe
 
 ## Security notes
 
-- All admin routes are guarded by a Next.js `proxy.ts` (formerly middleware) that checks the JWT cookie.
+- The Next.js `proxy.ts` performs an early session redirect, while every admin route handler and server page independently revalidates authorization and tenant ownership.
 - Google OAuth uses a short-lived state cookie, verifies Google ID tokens and verified email addresses, and links provider identities through `OAuthAccount` rather than storing OAuth users with fake passwords.
 - Public chat endpoints (`/api/public/*` and `/embed/*`) only accept a bot's `publicKey` — internal IDs are never exposed.
 - Public lead submissions are validated, rate-limited, and only accepted when lead capture is enabled for an active bot.
-- Per-workspace API keys are stored in the database; never sent to the client (masked in UI).
-- File uploads are MIME-type checked and size-capped (default 10 MB).
+- Published widgets enforce configured website origins for chat, lead, and telemetry requests. Empty origin lists remain available for local setup and must be tightened before production launch.
+- Published bot versions pin both settings and approved source IDs. Draft knowledge changes do not affect visitor retrieval until publish; rollback restores the selected settings and source snapshot.
+- Per-workspace provider keys and new tool headers are AES-256-GCM encrypted with `WORKSPACE_SECRETS_KEY`, never returned to the client, and masked in UI. After deploying the migration, run `npm run secrets:migrate` to encrypt legacy workspace keys and clear their plaintext fields.
+- File uploads are extension/MIME/signature checked, size-capped (default 10 MB), stored in tenant-scoped private object storage, and removed with their source lifecycle.
 - Website ingestion validates every redirect target, blocks local/private network addresses, and caps pages at 5 MB to reduce SSRF and memory-abuse risk.
 - Public chat and lead endpoints support distributed Upstash rate limiting and use a bounded per-instance fallback when Redis is not configured.
+- `/admin` is separate from `/dashboard` and requires a platform role checked in route handlers and server components. The bootstrap administrator must change its password before accessing platform metrics.
+- The platform dashboard uses aggregate records and privacy-minimized embed events. It never exposes provider keys or raw customer content by default.
 - Google client secrets and downloaded `client_secret_*.json` files must never be committed. Rotate any credential exposed in chat, screenshots, logs, or public history.
-- Tenant isolation: every admin query is scoped by `workspace.ownerId = session.userId`.
+- Tenant isolation: workspace ownership and membership are server-scoped; governance changes require Admin/Owner access, service identities require explicit scopes, and platform roles remain separate.
+- Organization policy can restrict providers/models, external tools, production promotion, retention, region, and customer-managed key references.
+- See [Trust Center](docs/TRUST_CENTER.md), [Plugin Manifest](docs/PLUGIN_MANIFEST.md), and [Production Operations](docs/OPERATIONS.md).
+
+Run `npm run verify` before opening a pull request. GitHub Actions repeats Prisma validation, type-checking, lint, authorization/upload safety tests, production build, high-severity dependency blocking, and CycloneDX SBOM generation.
 
 ---
 
 ## Roadmap
 
-- [ ] Full multi-page website crawler with depth limit
-- [ ] Google Drive integration (scaffold already in `lib/loaders/googledrive.ts`)
-- [ ] Slack / Teams bot integrations
-- [ ] Human-handoff notifications and CRM exports
-- [ ] Complete approval/resume UI for tools marked `REQUIRE_CONFIRM`
-- [ ] Durable object storage and queued ingestion for large files and high-volume workloads
-- [ ] Multi-language chatbots
-- [ ] Advanced moderation + custom blocklists
-- [ ] White-label branding (custom domains, theme colors, fonts)
-- [ ] Optional managed cloud tier with SaaS billing
-- [ ] API access + webhooks
-- [ ] Marketplace of chatbot templates
-- [ ] Self-hosted enterprise build with SSO + audit logs
+The core contracts for the original four phases are present. Next releases focus on production adapters and certification evidence rather than duplicate product flows:
+
+- [ ] Durable object storage, malware scanning, isolated OCR worker, and queue adapters for large/high-volume files (local inline OCR covers the first 10 scanned PDF pages)
+- [ ] Google Drive incremental sync and reviewed Slack/Teams/WhatsApp channel packages
+- [ ] Certified OIDC/SAML profiles, passkeys/MFA, managed KMS adapters, and regional deployment evidence
+- [ ] Community security review and signed distribution for plugin/template catalog entries
+- [ ] Statistical experiment reporting, locale benchmark packs, and human-agent response assist
+- [ ] Managed cloud billing, white-label domains, advanced moderation, legal hold, and sector profiles
 
 ---
 

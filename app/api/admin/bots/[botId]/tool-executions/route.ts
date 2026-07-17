@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/jwt";
 import { db } from "@/lib/db/client";
+import { canAccessBot } from "@/lib/auth/workspace-access";
 
 export async function GET(
   _req: NextRequest,
@@ -9,11 +10,7 @@ export async function GET(
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { botId } = await params;
-
-  const bot = await db.bot.findFirst({
-    where: { id: botId, workspace: { ownerId: session.userId } },
-  });
-  if (!bot) return NextResponse.json({ error: "Bot not found" }, { status: 404 });
+  if (!await canAccessBot(botId, session.userId, "tool:write")) return NextResponse.json({ error: "Bot not found" }, { status: 404 });
 
   const executions = await db.toolExecution.findMany({
     where: { tool: { botId } },

@@ -4,17 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/*.test.ts",
+    "verify": "npm run type-check && npm run lint && npm test && npm run build",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "ts-node scripts/seed.ts"
+    "db:seed": "ts-node scripts/seed.ts",
+    "admin:bootstrap": "ts-node scripts/bootstrap-platform-admin.ts",
+    "secrets:migrate": "ts-node scripts/migrate-workspace-secrets.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.2",
+    "@aws-sdk/client-s3": "^3.1087.0",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -55,8 +61,11 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.75.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.6.0",
+    "tesseract.js": "^6.0.1",
     "uuid": "^14.0.0",
     "youtube-transcript": "^1.3.1",
     "zod": "^4.4.3"

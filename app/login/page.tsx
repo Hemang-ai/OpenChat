@@ -14,7 +14,7 @@ import { toast } from "@/lib/utils/use-toast";
 import { GoogleSignIn } from "@/components/auth/google-sign-in";
 
 const schema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().trim().min(1, "Email or username is required").max(255),
   password: z.string().min(1, "Password is required"),
 });
 type FormData = z.infer<typeof schema>;
@@ -82,8 +82,8 @@ export default function LoginPage() {
             <GoogleSignIn />
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-1">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="you@company.com" {...register("email")} />
+                <Label htmlFor="email">Email or username</Label>
+                <Input id="email" type="text" autoComplete="username" placeholder="you@company.com" {...register("email")} />
                 {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
               </div>
               <div className="space-y-1">

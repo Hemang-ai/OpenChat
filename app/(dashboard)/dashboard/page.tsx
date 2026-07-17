@@ -6,15 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import CreateBotDialog from "@/components/dashboard/create-bot-dialog";
-import { Bot, MessageSquare, Plus, Settings, UserPlus } from "lucide-react";
+import { Bot, MessageSquare, Settings, UserPlus } from "lucide-react";
+import { hasWorkspacePermission, workspaceAccessWhere } from "@/lib/auth/workspace-access";
 
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const workspaces = await db.workspace.findMany({
-    where: { ownerId: session.userId },
+    where: workspaceAccessWhere(session.userId),
     include: {
+      members: { where: { userId: session.userId }, select: { role: true } },
       bots: {
         orderBy: { createdAt: "desc" },
         include: {
@@ -39,7 +41,9 @@ export default async function DashboardPage() {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Manage your AI chatbots</p>
         </div>
-        <CreateBotDialog workspaces={workspaces.map((w) => ({ id: w.id, name: w.name }))} />
+        {workspaces.some((workspace) => workspace.ownerId === session.userId || hasWorkspacePermission(workspace.members[0]?.role || "VIEWER", "bot:write")) && (
+          <CreateBotDialog workspaces={workspaces.filter((workspace) => workspace.ownerId === session.userId || hasWorkspacePermission(workspace.members[0]?.role || "VIEWER", "bot:write")).map((workspace) => ({ id: workspace.id, name: workspace.name }))} />
+        )}
       </div>
 
       {workspaces.map((workspace) => (
@@ -56,15 +60,11 @@ export default async function DashboardPage() {
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <Bot className="w-10 h-10 text-gray-300 mb-3" />
                 <p className="text-gray-500 text-sm mb-4">No chatbots yet in this workspace</p>
-                <CreateBotDialog
+                {(workspace.ownerId === session.userId || hasWorkspacePermission(workspace.members[0]?.role || "VIEWER", "bot:write")) && <CreateBotDialog
                   workspaces={[{ id: workspace.id, name: workspace.name }]}
                   defaultWorkspaceId={workspace.id}
-                  trigger={
-                    <Button size="sm" variant="outline" className="gap-1">
-                      <Plus className="w-3 h-3" /> Create first bot
-                    </Button>
-                  }
-                />
+                  firstBot
+                />}
               </CardContent>
             </Card>
           ) : (
